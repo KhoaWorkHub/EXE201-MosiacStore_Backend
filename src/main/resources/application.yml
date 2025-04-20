@@ -13,6 +13,17 @@ spring:
     host: localhost
     port: 1025 # MailHog port
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: 555689664668-aj5km7b0atsenvt6drksupnkq2kq649n.apps.googleusercontent.com
+            client-secret: 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
+            scope:
+              - email
+              - profile
+
 application:
   security:
     jwt:
