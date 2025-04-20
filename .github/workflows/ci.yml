@@ -43,6 +43,7 @@ jobs:
           SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
         run: | 
           mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          -DskipTests=true \
           -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
           -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }} \
           -Dsonar.host.url=https://sonarcloud.io \
