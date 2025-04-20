@@ -30,10 +30,10 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Build with Maven
-        run: mvn -B clean package --file mosiac/pom.xml
+        run: mvn -B clean package -DskipTests=true --file pom.xml
 
       - name: Run tests
-        run: mvn test --file mosiac/pom.xml
+        run: mvn test --file pom.xml
 
       - name: SonarCloud Scan
         env:
@@ -46,13 +46,13 @@ jobs:
           -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }} \
           -Dsonar.host.url=https://sonarcloud.io \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-          --file mosiac/pom.xml
+          --file pom.xml
 
       - name: Archive production artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jar-file
-          path: mosiac/target/*.jar
+          path: target/*.jar
 
   docker:
     needs: build
@@ -66,7 +66,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: jar-file
-          path: mosiac/target
+          path: target
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -80,6 +80,6 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./mosiac
+          context: .
           push: true
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/vietshirt-qr:latest
