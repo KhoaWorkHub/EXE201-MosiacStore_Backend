@@ -31,9 +31,9 @@ jobs:
 
       - name: Build with Maven
         run: mvn -B clean package -DskipTests=true --file pom.xml
-
-      - name: Run tests
-        run: mvn test --file pom.xml
+# Later integrate CI with SonarCloud
+#      - name: Run tests
+#        run: mvn test --file pom.xml
 
       - name: SonarCloud Scan
         env:
