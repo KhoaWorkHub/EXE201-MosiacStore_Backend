@@ -30,7 +30,7 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       - name: Build with Maven
-        run: mvn -B clean package --file pom.xml
+        run: mvn -B clean package -DskipTests=true --file pom.xml
 
       - name: Run tests
         run: mvn test --file pom.xml
@@ -66,7 +66,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: jar-file
-          path: mosiac/target
+          path: target
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
