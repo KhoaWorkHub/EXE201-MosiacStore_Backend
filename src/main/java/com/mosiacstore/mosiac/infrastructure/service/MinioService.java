@@ -25,7 +25,7 @@ public class MinioService {
      * Upload file to MinIO server
      * @param file The file to upload
      * @param folder Folder path (example: "products")
-     * @return The URL of the uploaded file
+     * @return The URL of the uploaded files
      */
     public String uploadFile(MultipartFile file, String folder) {
         try {
