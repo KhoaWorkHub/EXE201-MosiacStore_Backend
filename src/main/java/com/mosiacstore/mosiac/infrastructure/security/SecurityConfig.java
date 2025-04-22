@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .requestMatchers("/oauth2/**", "/login/oauth2/code/google").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/oauth2/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -41,9 +42,8 @@ public class SecurityConfig {
                 )
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                // Add OAuth2 configuration
                 .oauth2Login(oauth2 -> oauth2
-                        .loginPage("/oauth2/authorization/google") // Default URL for OAuth2 login
+                        .loginPage("/oauth2/authorization/google")
                         .successHandler(oAuth2LoginSuccessHandler)
                 );
 
