@@ -36,18 +36,15 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         OAuth2User oAuth2User = oauthToken.getPrincipal();
         String provider = oauthToken.getAuthorizedClientRegistrationId();
 
-        // Extract user info
         Map<String, Object> attributes = oAuth2User.getAttributes();
         String email = (String) attributes.get("email");
-        String providerId = (String) attributes.get("sub");  // Google uses "sub" for user ID
+        String providerId = (String) attributes.get("sub");
         String name = (String) attributes.get("name");
 
-        // Check if user exists
         Optional<User> userOptional = userRepository.findByEmail(email);
         User user;
 
         if (userOptional.isPresent()) {
-            // User exists - update OAuth info if needed
             user = userOptional.get();
             if (user.getProvider() == null || !user.getProvider().equals(provider) ||
                     user.getProviderId() == null || !user.getProviderId().equals(providerId)) {
@@ -58,13 +55,12 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 userRepository.save(user);
             }
         } else {
-            // Create new user
             user = User.builder()
                     .email(email)
                     .fullName(name)
                     .provider(provider.toUpperCase())
                     .providerId(providerId)
-                    .passwordHash(UUID.randomUUID().toString()) // Random password
+                    .passwordHash(UUID.randomUUID().toString())
                     .role(UserRole.CUSTOMER)
                     .status(UserStatus.ACTIVE)
                     .build();
@@ -74,13 +70,11 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             userRepository.save(user);
         }
 
-        // Generate JWT token
         CustomUserDetail userDetail = new CustomUserDetail(user);
         String token = jwtService.generateToken(userDetail);
         String refreshToken = jwtService.generateRefreshToken(userDetail);
 
-        // Redirect with token (frontend will capture this)
-        // For development, you might redirect to frontend with token as parameter
-        response.sendRedirect("http://localhost:3000/oauth2/redirect?token=" + token + "&refreshToken=" + refreshToken);
+
+        response.sendRedirect("http://localhost:5173/oauth2/redirect?token=" + token + "&refreshToken=" + refreshToken);
     }
 }
