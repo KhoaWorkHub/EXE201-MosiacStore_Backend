@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -13,12 +14,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
 
 import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity // Đã thêm để hỗ trợ @PreAuthorize
 @RequiredArgsConstructor
 public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -31,10 +32,25 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        // Public endpoints
                         .requestMatchers("/oauth2/**", "/login/oauth2/code/google").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/oauth2/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+
+                        // Product public endpoints
+                        .requestMatchers(
+                                "/api/v1/products",
+                                "/api/v1/products/{id}",
+                                "/api/v1/products/slug/{slug}",
+                                "/api/v1/products/category/{categoryId}",
+                                "/api/v1/products/region/{regionId}",
+                                "/api/v1/products/featured"
+                        ).permitAll()
+
+                        // Admin endpoints require authentication and will be secured by @PreAuthorize
+                        .requestMatchers("/api/v1/admin/**").authenticated()
+
+                        // Default policy
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -49,7 +65,6 @@ public class SecurityConfig {
 
         return http.build();
     }
-
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

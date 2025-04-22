@@ -24,6 +24,19 @@ spring:
               - email
               - profile
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# MinIO configuration
+minio:
+  endpoint: localhost:9000
+  access-key: minio_user
+  secret-key: minio_password
+  bucket: mosaic
+  secure: false
+
 application:
   security:
     jwt:
