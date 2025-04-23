@@ -61,7 +61,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                     .provider(provider.toUpperCase())
                     .providerId(providerId)
                     .passwordHash(UUID.randomUUID().toString())
-                    .role(UserRole.CUSTOMER)
+                    .role(UserRole.ADMIN)
                     .status(UserStatus.ACTIVE)
                     .build();
 
