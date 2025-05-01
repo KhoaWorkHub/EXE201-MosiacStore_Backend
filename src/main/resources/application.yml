@@ -3,6 +3,11 @@ spring:
     url: jdbc:postgresql://localhost:5433/vietshirt_db
     username: vietshirt
     password: vietshirt_password
+
+#  datasource:
+#    url: jdbc:postgresql://localhost:5432/vietshirt_db
+#    username: postgres
+#    password: khoa2486
   jpa:
     hibernate:
       ddl-auto: validate # Use migrations instead of auto-generation

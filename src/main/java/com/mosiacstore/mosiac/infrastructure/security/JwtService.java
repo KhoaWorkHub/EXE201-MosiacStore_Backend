@@ -21,7 +21,15 @@ public class JwtService {
     private final JwtProperties jwtProperties;
 
     public String generateToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails);
+        Map<String, Object> extraClaims = new HashMap<>();
+
+        if (userDetails instanceof CustomUserDetail) {
+            CustomUserDetail customUserDetail = (CustomUserDetail) userDetails;
+            extraClaims.put("role", customUserDetail.getUser().getRole().name());
+            extraClaims.put("fullName", customUserDetail.getUser().getFullName());
+        }
+
+        return generateToken(extraClaims, userDetails);
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
