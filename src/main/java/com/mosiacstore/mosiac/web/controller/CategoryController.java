@@ -6,16 +6,19 @@ import com.mosiacstore.mosiac.application.dto.response.CategoryResponse;
 import com.mosiacstore.mosiac.application.dto.response.PageResponse;
 import com.mosiacstore.mosiac.application.service.CategoryService;
 import com.mosiacstore.mosiac.infrastructure.security.CustomUserDetail;
+import com.mosiacstore.mosiac.infrastructure.service.MinioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +30,7 @@ import java.util.UUID;
 public class CategoryController {
 
     private final CategoryService categoryService;
+    private final MinioService minioService;
 
     @Operation(summary = "Get all categories with pagination")
     @GetMapping("/categories")
@@ -51,28 +55,63 @@ public class CategoryController {
     }
 
     @Operation(
-            summary = "Create a new category",
+            summary = "Create a new category with image upload support",
             security = @SecurityRequirement(name = "Bearer Authentication")
     )
-    @PostMapping("/admin/categories")
+    @PostMapping(
+            value = "/admin/categories",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CategoryResponse> createCategory(
-            @Valid @RequestBody CategoryRequest request,
+            @Valid @ModelAttribute CategoryRequest request,
             @AuthenticationPrincipal CustomUserDetail currentUser) {
+
+        if (request.getFile() != null && !request.getFile().isEmpty()) {
+            String url = minioService.uploadFile(request.getFile(), "categories");
+            request.setImageUrl(url);
+        }
 
         return new ResponseEntity<>(categoryService.createCategory(request), HttpStatus.CREATED);
     }
 
     @Operation(
-            summary = "Update a category",
+            summary = "Update a category with image upload support",
             security = @SecurityRequirement(name = "Bearer Authentication")
     )
-    @PutMapping("/admin/categories/{id}")
+    @PutMapping(
+            value = "/admin/categories/{id}",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CategoryResponse> updateCategory(
             @PathVariable UUID id,
-            @Valid @RequestBody CategoryRequest request,
+            @RequestParam String name,
+            @RequestParam(required = false) String slug,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) UUID parentId,
+            @RequestParam(defaultValue = "0") Integer displayOrder,
+            @RequestParam(defaultValue = "true") Boolean active,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "imageUrl", required = false) String imageUrl,
             @AuthenticationPrincipal CustomUserDetail currentUser) {
+
+        String newImageUrl = null;
+        if (file != null && !file.isEmpty()) {
+            newImageUrl = minioService.uploadFile(file, "categories");
+        } else {
+            newImageUrl = imageUrl;
+        }
+
+        CategoryRequest request = CategoryRequest.builder()
+                .name(name)
+                .slug(slug)
+                .description(description)
+                .parentId(parentId)
+                .imageUrl(newImageUrl)
+                .displayOrder(displayOrder)
+                .active(active)
+                .build();
 
         return ResponseEntity.ok(categoryService.updateCategory(id, request));
     }
