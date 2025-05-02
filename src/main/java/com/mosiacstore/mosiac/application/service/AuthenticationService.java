@@ -11,6 +11,7 @@ import com.mosiacstore.mosiac.infrastructure.repository.UserRepository;
 import com.mosiacstore.mosiac.infrastructure.security.CustomUserDetail;
 import com.mosiacstore.mosiac.infrastructure.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.codec.DecoderException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -24,7 +25,7 @@ public class AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final AuthMapper authMapper;
 
-    public AuthenticationResponse authenticate(AuthenticationRequest request) {
+    public AuthenticationResponse authenticate(AuthenticationRequest request) throws DecoderException {
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(

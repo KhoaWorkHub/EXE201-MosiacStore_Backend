@@ -2,7 +2,6 @@ package com.mosiacstore.mosiac.infrastructure.security;
 
 import com.mosiacstore.mosiac.domain.user.User;
 import com.mosiacstore.mosiac.domain.user.UserStatus;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
