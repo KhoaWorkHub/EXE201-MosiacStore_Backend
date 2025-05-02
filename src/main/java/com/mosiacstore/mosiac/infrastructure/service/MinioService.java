@@ -3,6 +3,7 @@ package com.mosiacstore.mosiac.infrastructure.service;
 import com.mosiacstore.mosiac.infrastructure.config.MinioConfig;
 import io.minio.*;
 import io.minio.errors.*;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,45 @@ import java.util.UUID;
 public class MinioService {
     private final MinioClient minioClient;
     private final MinioConfig minioConfig;
+
+    @PostConstruct
+    public void setupBucket() {
+        try {
+            // Check if bucket exists
+            boolean bucketExists = minioClient.bucketExists(BucketExistsArgs.builder()
+                    .bucket(minioConfig.getBucket())
+                    .build());
+
+            if (!bucketExists) {
+                minioClient.makeBucket(MakeBucketArgs.builder()
+                        .bucket(minioConfig.getBucket())
+                        .build());
+            }
+
+            String policy = """
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": ["*"]},
+                        "Action": ["s3:GetObject"],
+                        "Resource": ["arn:aws:s3:::%s/*"]
+                    }
+                ]
+            }
+            """.formatted(minioConfig.getBucket());
+
+            minioClient.setBucketPolicy(SetBucketPolicyArgs.builder()
+                    .bucket(minioConfig.getBucket())
+                    .config(policy)
+                    .build());
+
+            log.info("Bucket {} configured with public read policy", minioConfig.getBucket());
+        } catch (Exception e) {
+            log.error("Error configuring bucket policy", e);
+        }
+    }
 
     /**
      * Upload file to MinIO server
