@@ -15,7 +15,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ProductVariantResponse {
     private UUID id;
-    private ProductSize size;
+    private String size;
     private String color;
     private BigDecimal priceAdjustment;
     private Integer stockQuantity;

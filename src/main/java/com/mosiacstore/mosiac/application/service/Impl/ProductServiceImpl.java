@@ -11,10 +11,7 @@ import com.mosiacstore.mosiac.application.exception.ResourceConflictException;
 import com.mosiacstore.mosiac.application.mapper.ProductMapper;
 import com.mosiacstore.mosiac.application.service.ProductService;
 import com.mosiacstore.mosiac.application.service.SlugService;
-import com.mosiacstore.mosiac.domain.product.Product;
-import com.mosiacstore.mosiac.domain.product.ProductCategory;
-import com.mosiacstore.mosiac.domain.product.ProductImage;
-import com.mosiacstore.mosiac.domain.product.ProductVariant;
+import com.mosiacstore.mosiac.domain.product.*;
 import com.mosiacstore.mosiac.domain.region.Region;
 import com.mosiacstore.mosiac.infrastructure.repository.ProductCategoryRepository;
 import com.mosiacstore.mosiac.infrastructure.repository.ProductImageRepository;
@@ -189,7 +186,6 @@ public class ProductServiceImpl implements ProductService {
         productRepository.delete(product);
     }
 
-    @Override
     @Transactional
     public List<ProductImageResponse> uploadProductImages(
             UUID productId,
@@ -199,24 +195,30 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + productId));
         List<ProductImage> savedImages = new ArrayList<>();
+
         for (MultipartFile file : files) {
-            String imageUrl = minioService.uploadFile(file, "products");
-            ProductImage image = new ProductImage();
-            image.setProduct(product);
-            image.setImageUrl(imageUrl);
-            image.setAltText(altText);
-            List<ProductImage> existingImages = imageRepository.findByProductIdOrderByDisplayOrderAsc(productId);
-            int displayOrder = existingImages.isEmpty() ? 0 : existingImages.get(existingImages.size() - 1).getDisplayOrder() + 1;
-            image.setDisplayOrder(displayOrder);
-            if (Boolean.TRUE.equals(isPrimary)) {
-                imageRepository.updateNonPrimaryImages(productId, null);
-                image.setIsPrimary(true);
-            } else if (existingImages.isEmpty() || !existingImages.stream().anyMatch(ProductImage::getIsPrimary)) {
-                image.setIsPrimary(true);
-            } else {
-                image.setIsPrimary(false);
+            try {
+                String imageUrl = minioService.uploadFile(file, "products");
+                ProductImage image = new ProductImage();
+                image.setProduct(product);
+                image.setImageUrl(imageUrl);
+                image.setAltText(altText);
+                List<ProductImage> existingImages = imageRepository.findByProductIdOrderByDisplayOrderAsc(productId);
+                int displayOrder = existingImages.isEmpty() ? 0 : existingImages.get(existingImages.size() - 1).getDisplayOrder() + 1;
+                image.setDisplayOrder(displayOrder);
+                if (Boolean.TRUE.equals(isPrimary)) {
+                    imageRepository.updateNonPrimaryImages(productId, null);
+                    image.setIsPrimary(true);
+                } else if (existingImages.isEmpty() || !existingImages.stream().anyMatch(ProductImage::getIsPrimary)) {
+                    image.setIsPrimary(true);
+                } else {
+                    image.setIsPrimary(false);
+                }
+                savedImages.add(imageRepository.save(image));
+            } catch (Exception e) {
+                log.error("Failed to upload file: {} for product ID: {}", file.getOriginalFilename(), productId, e);
+                throw new RuntimeException("Failed to upload image: " + file.getOriginalFilename(), e);
             }
-            savedImages.add(imageRepository.save(image));
         }
         return savedImages.stream()
                 .map(productMapper::toProductImageResponse)
@@ -264,21 +266,36 @@ public class ProductServiceImpl implements ProductService {
     public ProductVariantResponse addProductVariant(UUID productId, ProductVariantRequest request) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + productId));
-        if (variantRepository.existsByProductIdAndSizeAndColor(
-                productId, request.getSize().name(), request.getColor())) {
-            throw new ResourceConflictException("Variant with size " + request.getSize() +
+
+        ProductSize sizeEnum;
+        try {
+            sizeEnum = ProductSize.valueOf(request.getSize().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid size value: " + request.getSize());
+        }
+
+        // Thêm log để kiểm tra
+        log.info("Checking variant existence - productId: {}, size: {}, color: {}",
+                productId, sizeEnum, request.getColor());
+
+        // Sử dụng phương thức với ProductSize
+        if (variantRepository.existsByProductIdAndSizeAndColor(productId, sizeEnum, request.getColor())) {
+            throw new ResourceConflictException("Variant with size " + sizeEnum +
                     " and color " + request.getColor() + " already exists for this product");
         }
+
         ProductVariant variant = productMapper.toProductVariant(request);
         variant.setProduct(product);
+
         if (variant.getActive() == null) variant.setActive(true);
         if (variant.getPriceAdjustment() == null) variant.setPriceAdjustment(java.math.BigDecimal.ZERO);
         if (variant.getSkuVariant() == null || variant.getSkuVariant().isEmpty()) {
-            String baseSkuSku = product.getSku() != null ? product.getSku() :
+            String baseSku = product.getSku() != null ? product.getSku() :
                     "P" + product.getId().toString().substring(0, 8).toUpperCase();
-            variant.setSkuVariant(baseSkuSku + "-" + variant.getSize() +
+            variant.setSkuVariant(baseSku + "-" + variant.getSize() +
                     (variant.getColor() != null ? "-" + variant.getColor() : ""));
         }
+
         ProductVariant savedVariant = variantRepository.save(variant);
         return productMapper.toProductVariantResponse(savedVariant);
     }
@@ -288,24 +305,44 @@ public class ProductServiceImpl implements ProductService {
     public ProductVariantResponse updateProductVariant(UUID variantId, ProductVariantRequest request) {
         ProductVariant variant = variantRepository.findById(variantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product variant not found with ID: " + variantId));
-        boolean sizeChanged = request.getSize() != null && request.getSize() != variant.getSize();
-        boolean colorChanged = request.getColor() != null && !request.getColor().equals(variant.getColor());
-        if (sizeChanged || colorChanged) {
-            String newSize = sizeChanged ? request.getSize().name() : variant.getSize().name();
-            String newColor = colorChanged ? request.getColor() : variant.getColor();
-            if (variantRepository.existsByProductIdAndSizeAndColor(
-                    variant.getProduct().getId(), newSize, newColor)) {
-                throw new ResourceConflictException("Variant with size " + newSize +
-                        " and color " + newColor + " already exists for this product");
+
+        // Chuyển đổi size từ String sang ProductSize
+        ProductSize newSize = null;
+        if (request.getSize() != null) {
+            try {
+                newSize = ProductSize.valueOf(request.getSize().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid size value: " + request.getSize());
             }
         }
-        if (request.getSize() != null) variant.setSize(request.getSize());
+
+        // Kiểm tra trùng lặp nếu size hoặc color thay đổi
+        boolean sizeChanged = newSize != null && newSize != variant.getSize();
+        boolean colorChanged = request.getColor() != null && !request.getColor().equals(variant.getColor());
+        if (sizeChanged || colorChanged) {
+            ProductSize checkSize = sizeChanged ? newSize : variant.getSize();
+            String checkColor = colorChanged ? request.getColor() : variant.getColor();
+
+            // Thêm log để kiểm tra
+            log.info("Checking variant existence in update - productId: {}, size: {}, color: {}",
+                    variant.getProduct().getId(), checkSize, checkColor);
+
+            // Sử dụng phương thức với ProductSize
+            if (variantRepository.existsByProductIdAndSizeAndColor(variant.getProduct().getId(), checkSize, checkColor)) {
+                throw new ResourceConflictException("Variant with size " + checkSize +
+                        " and color " + checkColor + " already exists for this product");
+            }
+        }
+
+        // Cập nhật các trường
+        if (newSize != null) variant.setSize(newSize);
         if (request.getColor() != null) variant.setColor(request.getColor());
         if (request.getPriceAdjustment() != null) variant.setPriceAdjustment(request.getPriceAdjustment());
         if (request.getStockQuantity() != null) variant.setStockQuantity(request.getStockQuantity());
         if (request.getSkuVariant() != null) variant.setSkuVariant(request.getSkuVariant());
         if (request.getActive() != null) variant.setActive(request.getActive());
         variant.setUpdatedAt(LocalDateTime.now());
+
         ProductVariant updatedVariant = variantRepository.save(variant);
         return productMapper.toProductVariantResponse(updatedVariant);
     }

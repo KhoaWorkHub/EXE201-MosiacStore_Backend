@@ -10,7 +10,6 @@ import com.mosiacstore.mosiac.application.dto.response.ProductVariantResponse;
 import com.mosiacstore.mosiac.application.service.ProductService;
 import com.mosiacstore.mosiac.infrastructure.security.CustomUserDetail;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
