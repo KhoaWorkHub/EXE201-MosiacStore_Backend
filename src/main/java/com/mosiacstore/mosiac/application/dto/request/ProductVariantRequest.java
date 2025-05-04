@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ProductVariantRequest {
     @NotNull(message = "Size is required")
-    private ProductSize size;
+    private String size;
 
     private String color;
 
