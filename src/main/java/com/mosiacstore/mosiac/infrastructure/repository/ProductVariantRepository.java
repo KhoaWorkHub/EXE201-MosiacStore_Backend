@@ -1,5 +1,6 @@
 package com.mosiacstore.mosiac.infrastructure.repository;
 
+import com.mosiacstore.mosiac.domain.product.ProductSize;
 import com.mosiacstore.mosiac.domain.product.ProductVariant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -20,5 +21,5 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     void deleteByProductId(UUID productId);
 
     // Check if a combination of product, size, and color already exists
-    boolean existsByProductIdAndSizeAndColor(UUID productId, String size, String color);
+    boolean existsByProductIdAndSizeAndColor(UUID productId, ProductSize size, String color);
 }

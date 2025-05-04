@@ -8,6 +8,7 @@ import com.mosiacstore.mosiac.application.dto.response.ProductVariantResponse;
 import com.mosiacstore.mosiac.domain.product.Product;
 import com.mosiacstore.mosiac.domain.product.ProductCategory;
 import com.mosiacstore.mosiac.domain.product.ProductImage;
+import com.mosiacstore.mosiac.domain.product.ProductSize;
 import com.mosiacstore.mosiac.domain.product.ProductVariant;
 import com.mosiacstore.mosiac.domain.qrcode.QRCode;
 import com.mosiacstore.mosiac.domain.region.Region;
@@ -44,6 +45,7 @@ public interface ProductMapper {
     void updateProductFromRequest(ProductRequest request, @MappingTarget Product product);
 
     // Variant mappings
+    @Mapping(target = "size", source = "size", qualifiedByName = "mapSizeToString")
     ProductVariantResponse toProductVariantResponse(ProductVariant variant);
 
     List<ProductVariantResponse> toProductVariantResponseList(List<ProductVariant> variants);
@@ -52,6 +54,7 @@ public interface ProductMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "product", ignore = true)
+    @Mapping(target = "size", source = "size", qualifiedByName = "mapSize")
     ProductVariant toProductVariant(ProductVariantRequest request);
 
     // Image mappings
@@ -95,5 +98,22 @@ public interface ProductMapper {
                 .qrData(qrCode.getQrData())
                 .redirectUrl(qrCode.getRedirectUrl())
                 .build();
+    }
+
+    @Named("mapSize")
+    default ProductSize mapSize(String size) {
+        if (size == null) {
+            throw new IllegalArgumentException("Size cannot be null");
+        }
+        try {
+            return ProductSize.valueOf(size.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid size value: " + size);
+        }
+    }
+
+    @Named("mapSizeToString")
+    default String mapSizeToString(ProductSize size) {
+        return size != null ? size.name() : null;
     }
 }
