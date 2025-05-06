@@ -2,6 +2,7 @@ package com.mosiacstore.mosiac.web.controller;
 
 import com.mosiacstore.mosiac.application.dto.request.ProductRequest;
 import com.mosiacstore.mosiac.application.dto.request.ProductVariantRequest;
+import com.mosiacstore.mosiac.application.dto.request.QRCodeRequest;
 import com.mosiacstore.mosiac.application.dto.response.ApiResponse;
 import com.mosiacstore.mosiac.application.dto.response.PageResponse;
 import com.mosiacstore.mosiac.application.dto.response.ProductImageResponse;
@@ -197,5 +198,60 @@ public class ProductController {
 
         productService.deleteProductVariant(variantId);
         return ResponseEntity.ok(new ApiResponse(true, "Product variant deleted successfully"));
+    }
+
+    @Operation(
+            summary = "Generate QR code for a product",
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @PostMapping("/admin/products/{id}/qrcode")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProductResponse> generateQRCode(
+            @PathVariable UUID id,
+            @Valid @RequestBody QRCodeRequest request,
+            @AuthenticationPrincipal CustomUserDetail currentUser) {
+
+        return ResponseEntity.ok(productService.generateQRCode(id, request));
+    }
+
+    @Operation(
+            summary = "Update QR code for a product",
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @PutMapping("/admin/products/{id}/qrcode")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProductResponse> updateQRCode(
+            @PathVariable UUID id,
+            @Valid @RequestBody QRCodeRequest request,
+            @AuthenticationPrincipal CustomUserDetail currentUser) {
+
+        return ResponseEntity.ok(productService.updateQRCode(id, request));
+    }
+
+    @Operation(
+            summary = "Delete QR code for a product",
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @DeleteMapping("/admin/products/{id}/qrcode")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse> deleteQRCode(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetail currentUser) {
+
+        productService.deleteQRCode(id);
+        return ResponseEntity.ok(new ApiResponse(true, "QR code deleted successfully"));
+    }
+
+    @Operation(
+            summary = "Scan a QR code"
+    )
+    @PostMapping("/products/qrcode/{qrId}/scan")
+    public ResponseEntity<ProductResponse.QRCodeResponse> scanQRCode(
+            @PathVariable UUID qrId,
+            @RequestParam(required = false) String ipAddress,
+            @RequestParam(required = false) String userAgent,
+            @RequestParam(required = false) String location) {
+
+        return ResponseEntity.ok(productService.recordQRCodeScan(qrId, ipAddress, userAgent, location));
     }
 }

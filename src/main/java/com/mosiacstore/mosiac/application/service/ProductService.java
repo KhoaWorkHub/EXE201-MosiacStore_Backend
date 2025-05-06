@@ -2,6 +2,7 @@ package com.mosiacstore.mosiac.application.service;
 
 import com.mosiacstore.mosiac.application.dto.request.ProductRequest;
 import com.mosiacstore.mosiac.application.dto.request.ProductVariantRequest;
+import com.mosiacstore.mosiac.application.dto.request.QRCodeRequest;
 import com.mosiacstore.mosiac.application.dto.response.PageResponse;
 import com.mosiacstore.mosiac.application.dto.response.ProductImageResponse;
 import com.mosiacstore.mosiac.application.dto.response.ProductResponse;
@@ -60,4 +61,41 @@ public interface ProductService {
     void deleteProductVariant(UUID variantId);
 
     PageResponse<ProductResponse> getFeaturedProducts(int page, int size);
+
+    /**
+     * Generate and associate a QR code for a product
+     *
+     * @param productId ID of the product
+     * @param request QR code details
+     * @return Updated product with QR code
+     */
+    ProductResponse generateQRCode(UUID productId, QRCodeRequest request);
+
+    /**
+     * Update QR code for a product
+     *
+     * @param productId ID of the product
+     * @param request QR code details
+     * @return Updated product with updated QR code
+     */
+    ProductResponse updateQRCode(UUID productId, QRCodeRequest request);
+
+    /**
+     * Delete QR code for a product
+     *
+     * @param productId ID of the product
+     * @return API response
+     */
+    void deleteQRCode(UUID productId);
+
+    /**
+     * Record a QR code scan
+     *
+     * @param qrId ID of the QR code
+     * @param ipAddress IP address of the scanner
+     * @param userAgent User agent of the scanner
+     * @param location Geographic location of the scanner
+     * @return The updated QR code with scan count
+     */
+    ProductResponse.QRCodeResponse recordQRCodeScan(UUID qrId, String ipAddress, String userAgent, String location);
 }
