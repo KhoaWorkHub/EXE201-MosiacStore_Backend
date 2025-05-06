@@ -2,23 +2,25 @@ package com.mosiacstore.mosiac.application.service.Impl;
 
 import com.mosiacstore.mosiac.application.dto.request.ProductRequest;
 import com.mosiacstore.mosiac.application.dto.request.ProductVariantRequest;
+import com.mosiacstore.mosiac.application.dto.request.QRCodeRequest;
 import com.mosiacstore.mosiac.application.dto.response.PageResponse;
 import com.mosiacstore.mosiac.application.dto.response.ProductImageResponse;
 import com.mosiacstore.mosiac.application.dto.response.ProductResponse;
 import com.mosiacstore.mosiac.application.dto.response.ProductVariantResponse;
 import com.mosiacstore.mosiac.application.exception.EntityNotFoundException;
+import com.mosiacstore.mosiac.application.exception.InvalidOperationException;
 import com.mosiacstore.mosiac.application.exception.ResourceConflictException;
 import com.mosiacstore.mosiac.application.mapper.ProductMapper;
 import com.mosiacstore.mosiac.application.service.ProductService;
 import com.mosiacstore.mosiac.application.service.SlugService;
 import com.mosiacstore.mosiac.domain.product.*;
+import com.mosiacstore.mosiac.domain.qrcode.QRCode;
+import com.mosiacstore.mosiac.domain.qrcode.QRScan;
 import com.mosiacstore.mosiac.domain.region.Region;
-import com.mosiacstore.mosiac.infrastructure.repository.ProductCategoryRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.ProductImageRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.ProductRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.ProductVariantRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.RegionRepository;
+import com.mosiacstore.mosiac.infrastructure.repository.*;
 import com.mosiacstore.mosiac.infrastructure.service.MinioService;
+import com.mosiacstore.mosiac.infrastructure.util.MockMultipartFile;
+import com.mosiacstore.mosiac.infrastructure.util.QRCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -30,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.image.BufferedImage;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +48,9 @@ public class ProductServiceImpl implements ProductService {
     private final RegionRepository regionRepository;
     private final ProductVariantRepository variantRepository;
     private final ProductImageRepository imageRepository;
+    private final QRCodeRepository qrCodeRepository;
+    private final QRScanRepository qrScanRepository;
+    private final QRCodeGenerator qrCodeGenerator;
     private final ProductMapper productMapper;
     private final MinioService minioService;
     private final SlugService slugService;
@@ -369,5 +375,145 @@ public class ProductServiceImpl implements ProductService {
                 productPage.isFirst(),
                 productPage.isLast()
         );
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse generateQRCode(UUID productId, QRCodeRequest request) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + productId));
+
+        // Check if QR code already exists
+        if (product.getQrCode() != null) {
+            throw new ResourceConflictException("QR code already exists for this product");
+        }
+
+        // Create QR data with product ID and timestamp for uniqueness
+        String qrData = "product:" + productId + ":" + System.currentTimeMillis();
+
+        try {
+            // Generate QR code image
+            BufferedImage qrImage = qrCodeGenerator.generateQRCodeImage(qrData, 300, 300);
+            byte[] qrImageBytes = qrCodeGenerator.toByteArray(qrImage);
+
+            // Upload to MinIO
+            MultipartFile multipartFile = new MockMultipartFile(
+                    "qrcode-" + productId + ".png",
+                    "qrcode-" + productId + ".png",
+                    "image/png",
+                    qrImageBytes
+            );
+            String imageUrl = minioService.uploadFile(multipartFile, "qrcodes");
+
+            // Create QR code entity
+            QRCode qrCode = new QRCode();
+            qrCode.setProduct(product);
+            qrCode.setQrData(qrData);
+            qrCode.setQrImageUrl(imageUrl);
+            qrCode.setRedirectUrl(request.getRedirectUrl());
+            qrCode.setScanCount(0);
+            qrCode.setActive(request.getActive() != null ? request.getActive() : true);
+            qrCode.setCreatedAt(LocalDateTime.now());
+            qrCode.setUpdatedAt(LocalDateTime.now());
+
+            product.setQrCode(qrCode);
+            product.setUpdatedAt(LocalDateTime.now());
+
+            Product savedProduct = productRepository.save(product);
+            return productMapper.toProductResponse(savedProduct);
+
+        } catch (Exception e) {
+            log.error("Failed to generate QR code for product ID: {}", productId, e);
+            throw new RuntimeException("Failed to generate QR code: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse updateQRCode(UUID productId, QRCodeRequest request) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + productId));
+
+        QRCode qrCode = product.getQrCode();
+        if (qrCode == null) {
+            throw new EntityNotFoundException("QR code not found for product with ID: " + productId);
+        }
+
+        if (request.getRedirectUrl() != null) {
+            qrCode.setRedirectUrl(request.getRedirectUrl());
+        }
+
+        if (request.getActive() != null) {
+            qrCode.setActive(request.getActive());
+        }
+
+        qrCode.setUpdatedAt(LocalDateTime.now());
+        product.setUpdatedAt(LocalDateTime.now());
+
+        Product savedProduct = productRepository.save(product);
+        return productMapper.toProductResponse(savedProduct);
+    }
+
+    @Override
+    @Transactional
+    public void deleteQRCode(UUID productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + productId));
+
+        QRCode qrCode = product.getQrCode();
+        if (qrCode == null) {
+            throw new EntityNotFoundException("QR code not found for product with ID: " + productId);
+        }
+
+        // Delete QR image from MinIO if exists
+        if (qrCode.getQrImageUrl() != null && !qrCode.getQrImageUrl().isEmpty()) {
+            try {
+                minioService.deleteFile(qrCode.getQrImageUrl());
+            } catch (Exception e) {
+                log.warn("Failed to delete QR code image file: {}", qrCode.getQrImageUrl(), e);
+            }
+        }
+
+        // Remove relationship and delete
+        product.setQrCode(null);
+        product.setUpdatedAt(LocalDateTime.now());
+        qrCodeRepository.delete(qrCode);
+
+        productRepository.save(product);
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse.QRCodeResponse recordQRCodeScan(UUID qrId, String ipAddress, String userAgent, String location) {
+        QRCode qrCode = qrCodeRepository.findById(qrId)
+                .orElseThrow(() -> new EntityNotFoundException("QR code not found with ID: " + qrId));
+
+        if (!qrCode.getActive()) {
+            throw new InvalidOperationException("QR code is inactive");
+        }
+
+        // Create scan record
+        QRScan scan = new QRScan();
+        scan.setQrCode(qrCode);
+        scan.setScanDate(LocalDateTime.now());
+        scan.setIpAddress(ipAddress);
+        scan.setUserAgent(userAgent);
+        scan.setGeoLocation(location);
+        scan.setCreatedAt(LocalDateTime.now());
+        scan.setUpdatedAt(LocalDateTime.now());
+
+        qrScanRepository.save(scan);
+
+        // Update scan count
+        qrCode.setScanCount(qrCode.getScanCount() + 1);
+        qrCode.setUpdatedAt(LocalDateTime.now());
+        QRCode updatedQrCode = qrCodeRepository.save(qrCode);
+
+        return ProductResponse.QRCodeResponse.builder()
+                .id(updatedQrCode.getId())
+                .qrImageUrl(updatedQrCode.getQrImageUrl())
+                .qrData(updatedQrCode.getQrData())
+                .redirectUrl(updatedQrCode.getRedirectUrl())
+                .build();
     }
 }
