@@ -6,6 +6,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
 @Entity
 @Table(name = "wards")
 @Getter
@@ -15,13 +19,35 @@ import lombok.Setter;
 public class Ward {
 
     @Id
-    @Column(name = "ward_code", length = 10)
-    private String wardCode;
+    @Column(name = "code", length = 20)
+    private String code;
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "name_en")
+    private String nameEn;
+
+    @Column(name = "full_name")
+    private String fullName;
+
+    @Column(name = "full_name_en")
+    private String fullNameEn;
+
+    @Column(name = "code_name")
+    private String codeName;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "district_code", referencedColumnName = "district_code", nullable = false)
+    @JoinColumn(name = "district_code")
     private District district;
 
-    @Column(name = "name", nullable = false, length = 100)
-    private String name;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "administrative_unit_id")
+    private AdministrativeUnit administrativeUnit;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }

@@ -28,15 +28,15 @@ public class Address extends BaseEntity {
     private String phone;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "province_code", referencedColumnName = "province_code")
+    @JoinColumn(name = "province_code")
     private Province province;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "district_code", referencedColumnName = "district_code")
+    @JoinColumn(name = "district_code")
     private District district;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ward_code", referencedColumnName = "ward_code")
+    @JoinColumn(name = "ward_code")
     private Ward ward;
 
     @Column(name = "street_address", nullable = false, length = 255)
