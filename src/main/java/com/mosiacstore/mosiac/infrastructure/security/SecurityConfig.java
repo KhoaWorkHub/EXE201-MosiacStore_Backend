@@ -44,7 +44,8 @@ public class SecurityConfig {
                                 "/api/v1/products/slug/{slug}",
                                 "/api/v1/products/category/{categoryId}",
                                 "/api/v1/products/region/{regionId}",
-                                "/api/v1/products/featured"
+                                "/api/v1/products/featured",
+                                "/api/v1/cart/**"
                         ).permitAll()
 
                         // Admin endpoints require authentication and will be secured by @PreAuthorize
