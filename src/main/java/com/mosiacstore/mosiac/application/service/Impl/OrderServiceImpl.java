@@ -272,9 +272,9 @@ public class OrderServiceImpl implements OrderService {
         if (paymentMethod == PaymentMethod.BANK_TRANSFER) {
             checkoutResponse.setPaymentInstructions(
                     "Please transfer the exact amount to the following bank account:\n" +
-                            "Bank: VIETCOMBANK\n" +
-                            "Account Number: 1234567890\n" +
-                            "Account Name: VIETSHIRT COMPANY\n" +
+                            "Bank: MOMO\n" +
+                            "Account Number: 0788732514\n" +
+                            "Account Name: MOSAIC STORE\n" +
                             "Amount: " + totalAmount + " VND\n" +
                             "Reference: " + savedOrder.getOrderNumber());
         }
