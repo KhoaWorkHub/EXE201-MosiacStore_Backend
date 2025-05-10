@@ -14,9 +14,30 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
   mail:
-    host: localhost
-    port: 1025 # MailHog port
+    host: smtp.gmail.com
+    port: 587
+    username: tkhoa7815@gmail.com
+    password: wgph gecm vlcc wcwt
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  # Async task execution for notifications and emails
+  task:
+    execution:
+      pool:
+        core-size: 5
+        max-size: 10
+        queue-capacity: 25
+      thread-name-prefix: mosiac-async-
 
   security:
     oauth2:
@@ -49,6 +70,7 @@ application:
       secret-key: ${JWT_SECRET:de07e529803afed066821cb3117a11fd258e41c990b2fc4018ae7d477c6717c18dcc0b3a978b5d52754b9621d666be8b80913ec5cf4a95cdca5227a4b373e665b0ad47e88f87276d6ecf80bf2e954084b9f8854ab3903021f0487fa869203afa91b2021f6138a40eefb1647cfff32e49ed8cce0c63a1028f03b6930117e5f2095beecb4cd2e45e9c2db3c9396ff9c9878ca30df498dc8f852825e4e761072e60cae08cd6abe338a13c533db3728cfe07c5eaafbad9e41a5ccad77179dedba0a3d6b511a10a50e81c62a25a5fbca3fd8264ec29348771975ba25527f01c5795c32f71ff9fde6d3d512e95006bcd59ad1e7476a007123d021af84a3eb2a56cae82cb2ce21ad6397c99902a9ce2cbc3ad41fd0bb2b5d4be6cf62ef7a49f2f10338d08c6abb80279e12e7e2a09e273365fe2bd2a5aeeca4dfa0c09a1e037e2bd6d88028dba3b26f45d8f8fceace0de83399965b81565855989460c21d3945aa4bde63c40abc87900e834264199d3eb8918d400a4ce229ab82d8214d8a59d8f9f8ff823ccd37da2e30f559b14d57ce1d878c4cb6d7725ea50ddb1e253d99958cd860f0ea6961d2dfdb9daee3fa6b989bd7fee64b6cb3478fe35633dfb13aa70e9034ffbe0869d170e4c24b34a140d04a98be1d23853b06314012a760c98bc420f2d19a91ac35b9efc8effd1168cf5f4b1700ce11b6176c21fb301e3a3aa0d67332351}
       expiration: 86400000  # 1 day (milliseconds)
       refresh-expiration: 604800000  # 7 days (milliseconds)
+  front-end-url: https://mosiacstore.vercel.app
 
 vnpay:
   version: 2.1.0

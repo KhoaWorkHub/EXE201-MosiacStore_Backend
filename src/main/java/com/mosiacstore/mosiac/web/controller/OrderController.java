@@ -6,6 +6,8 @@ import com.mosiacstore.mosiac.application.dto.response.CheckoutResponse;
 import com.mosiacstore.mosiac.application.dto.response.OrderResponse;
 import com.mosiacstore.mosiac.application.dto.response.PageResponse;
 import com.mosiacstore.mosiac.application.dto.response.PaymentResponse;
+import com.mosiacstore.mosiac.application.service.AdminNotificationService;
+import com.mosiacstore.mosiac.application.service.Impl.EmailService;
 import com.mosiacstore.mosiac.application.service.OrderService;
 import com.mosiacstore.mosiac.application.service.PaymentService;
 import com.mosiacstore.mosiac.infrastructure.security.CustomUserDetail;
@@ -14,6 +16,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @RestController
+@Slf4j
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 @Tag(name = "Orders", description = "Order and Checkout API")
@@ -32,6 +36,8 @@ public class OrderController {
 
     private final OrderService orderService;
     private final PaymentService paymentService;
+    private final AdminNotificationService adminNotificationService;
+    private final EmailService emailService;
 
     @Operation(
             summary = "Get user orders",
@@ -140,7 +146,13 @@ public class OrderController {
             @RequestParam String status,
             @RequestParam(required = false) String adminNote,
             @AuthenticationPrincipal CustomUserDetail currentUser) {
-        return ResponseEntity.ok(orderService.updateOrderStatus(id, status, adminNote, currentUser.getUser().getId()));
+
+        log.info("Admin {} updating order {} status to {} with note: {}",
+                currentUser.getUser().getEmail(), id, status, adminNote);
+
+        OrderResponse response = orderService.updateOrderStatus(id, status, adminNote, currentUser.getUser().getId());
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(
