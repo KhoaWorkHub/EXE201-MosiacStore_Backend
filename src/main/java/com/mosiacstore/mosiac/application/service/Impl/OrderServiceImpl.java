@@ -8,6 +8,7 @@ import com.mosiacstore.mosiac.application.dto.response.PageResponse;
 import com.mosiacstore.mosiac.application.dto.response.PaymentResponse;
 import com.mosiacstore.mosiac.application.exception.EntityNotFoundException;
 import com.mosiacstore.mosiac.application.exception.InvalidOperationException;
+import com.mosiacstore.mosiac.application.service.AdminNotificationService;
 import com.mosiacstore.mosiac.application.service.OrderService;
 import com.mosiacstore.mosiac.application.service.PaymentService;
 import com.mosiacstore.mosiac.domain.address.Address;
@@ -60,6 +61,8 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentRepository paymentRepository;
     private final PaymentService paymentService;
     private final ProductRepository productRepository;
+    private final AdminNotificationService adminNotificationService;
+    private final EmailService emailService;
 
     private static final BigDecimal FREE_SHIPPING_THRESHOLD = new BigDecimal("500000"); // 500,000 VND
     private static final BigDecimal STANDARD_SHIPPING_FEE = new BigDecimal("30000"); // 30,000 VND
@@ -279,8 +282,15 @@ public class OrderServiceImpl implements OrderService {
                             "Reference: " + savedOrder.getOrderNumber());
         }
 
+        // Send admin notification asynchronously
+        adminNotificationService.notifyNewOrder(savedOrder);
+
+        // Send confirmation email to customer
+        emailService.sendOrderConfirmationEmail(savedOrder);
+
         return checkoutResponse;
     }
+
 
     @Override
     @Transactional
@@ -398,6 +408,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Order not found with ID: " + id));
 
+        OrderStatus oldStatus = order.getStatus();
         OrderStatus newStatus;
         try {
             newStatus = OrderStatus.valueOf(status.toUpperCase());
@@ -413,6 +424,27 @@ public class OrderServiceImpl implements OrderService {
         order.setUpdatedAt(LocalDateTime.now());
 
         Order updatedOrder = orderRepository.save(order);
+
+        // Send email notification for status change
+        if (oldStatus != newStatus) {
+            switch (newStatus) {
+                case PROCESSING:
+                    emailService.sendOrderProcessingEmail(updatedOrder);
+                    break;
+                case SHIPPING:
+                    emailService.sendOrderShippingEmail(updatedOrder);
+                    break;
+                case DELIVERED:
+                    emailService.sendOrderDeliveredEmail(updatedOrder);
+                    break;
+                case CANCELLED:
+                    emailService.sendOrderCancelledEmail(updatedOrder);
+                    break;
+                default:
+                    break;
+            }
+        }
+
         return mapToOrderResponse(updatedOrder);
     }
 

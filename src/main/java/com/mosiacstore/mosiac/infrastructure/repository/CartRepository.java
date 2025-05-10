@@ -20,4 +20,7 @@ public interface CartRepository extends JpaRepository<Cart, UUID> {
 
     @Query("SELECT c FROM Cart c WHERE c.expiredAt < :now")
     List<Cart> findExpiredCarts(@Param("now") LocalDateTime now);
+
+    @Query("SELECT c FROM Cart c WHERE c.updatedAt < :timestamp AND SIZE(c.items) > 0")
+    List<Cart> findCartsWithItemsNotUpdatedSince(@Param("timestamp") LocalDateTime timestamp);
 }
