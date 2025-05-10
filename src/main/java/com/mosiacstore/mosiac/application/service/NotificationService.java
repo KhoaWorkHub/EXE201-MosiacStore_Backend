@@ -29,4 +29,11 @@ public interface NotificationService {
     long countUnreadNotifications(UUID userId);
 
     void sendChatNotification(UUID userId, UUID roomId, UUID messageId, String senderName, String messagePreview);
+
+    long countNotificationsByTypeAndUser(UUID userId, NotificationType type);
+
+    void markAllTypeAsRead(UUID userId, NotificationType type);
+
+    PageResponse<NotificationResponse> getNotificationsByTypeOnly(NotificationType type, int page, int size);
+
 }
