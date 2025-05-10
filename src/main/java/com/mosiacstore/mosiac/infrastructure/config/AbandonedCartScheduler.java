@@ -23,11 +23,10 @@ public class AbandonedCartScheduler {
 
     @Scheduled(fixedDelay = 30000)
     public void checkForAbandonedCarts() {
-        //LocalDateTime threeHoursAgo = LocalDateTime.now().minusHours(3);
-        LocalDateTime threeHoursAgo = LocalDateTime.now();
-
+        //LocalDateTime abandonedTime = LocalDateTime.now().minusHours(3);
+        LocalDateTime abandonedTime = LocalDateTime.now().minusSeconds(10);
         // Find carts that have items and haven't been updated in over 3 hours
-        List<Cart> abandonedCarts = cartRepository.findCartsWithItemsNotUpdatedSince(threeHoursAgo);
+        List<Cart> abandonedCarts = cartRepository.findCartsWithItemsNotUpdatedSince(abandonedTime);
 
         log.info("Found {} abandoned carts to notify admins about", abandonedCarts.size());
 
