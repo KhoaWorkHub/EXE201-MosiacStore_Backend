@@ -8,6 +8,7 @@ import com.mosiacstore.mosiac.application.service.NotificationService;
 import com.mosiacstore.mosiac.domain.notification.Notification;
 import com.mosiacstore.mosiac.domain.notification.NotificationType;
 import com.mosiacstore.mosiac.domain.user.User;
+import com.mosiacstore.mosiac.domain.user.UserRole;
 import com.mosiacstore.mosiac.infrastructure.repository.NotificationRepository;
 import com.mosiacstore.mosiac.infrastructure.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -242,5 +244,36 @@ public class NotificationServiceImpl implements NotificationService {
                 .actionUrl(notification.getActionUrl())
                 .createdAt(notification.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    public long countNotificationsByTypeAndUser(UUID userId, NotificationType type) {
+        return notificationRepository.countByUserIdAndType(userId, type);
+    }
+
+    @Override
+    @Transactional
+    public void markAllTypeAsRead(UUID userId, NotificationType type) {
+        notificationRepository.markAllAsReadByTypeAndUserId(userId, type);
+    }
+
+    @Override
+    public PageResponse<NotificationResponse> getNotificationsByTypeOnly(NotificationType type, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Notification> notificationPage = notificationRepository.findByType(type, pageable);
+
+        List<NotificationResponse> notificationResponses = notificationPage.getContent().stream()
+                .map(this::mapToNotificationResponse)
+                .collect(Collectors.toList());
+
+        return new PageResponse<>(
+                notificationResponses,
+                notificationPage.getNumber(),
+                notificationPage.getSize(),
+                notificationPage.getTotalElements(),
+                notificationPage.getTotalPages(),
+                notificationPage.isFirst(),
+                notificationPage.isLast()
+        );
     }
 }

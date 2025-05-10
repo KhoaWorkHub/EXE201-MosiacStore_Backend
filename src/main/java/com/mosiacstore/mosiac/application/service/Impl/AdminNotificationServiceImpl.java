@@ -8,19 +8,20 @@ import com.mosiacstore.mosiac.domain.notification.NotificationType;
 import com.mosiacstore.mosiac.domain.order.Order;
 import com.mosiacstore.mosiac.domain.user.User;
 import com.mosiacstore.mosiac.domain.user.UserRole;
+import com.mosiacstore.mosiac.infrastructure.repository.CartRepository;
 import com.mosiacstore.mosiac.infrastructure.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Service for handling admin-specific notifications for order and cart events
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -28,14 +29,12 @@ public class AdminNotificationServiceImpl implements AdminNotificationService {
 
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final CartRepository cartRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
-    /**
-     * Notify all admins about a new order
-     * This method runs asynchronously to not block the main workflow
-     */
     @Override
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public CompletableFuture<Void> notifyNewOrder(Order order) {
         try {
             List<User> adminUsers = userRepository.findByRole(UserRole.ADMIN);
@@ -105,12 +104,9 @@ public class AdminNotificationServiceImpl implements AdminNotificationService {
         }
     }
 
-    /**
-     * Notify admins about cart activities
-     * This is important for sales staff to proactively reach out to customers
-     */
     @Override
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public CompletableFuture<Void> notifyCartActivity(Cart cart, String activity, int itemCount) {
         try {
             List<User> salesUsers = userRepository.findByRole(UserRole.STAFF);
@@ -151,14 +147,15 @@ public class AdminNotificationServiceImpl implements AdminNotificationService {
         }
     }
 
-    /**
-     * Notify admins about abandoned carts
-     * This is scheduled to run periodically to identify inactive carts
-     */
     @Override
     @Async
-    public CompletableFuture<Void> notifyAbandonedCart(Cart cart) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public CompletableFuture<Void> notifyAbandonedCart(UUID cartId) {
         try {
+            // Reload the cart in this transaction context
+            Cart cart = cartRepository.findById(cartId)
+                    .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
+
             List<User> salesUsers = userRepository.findByRole(UserRole.STAFF);
             String customerInfo = cart.getUser() != null ?
                     cart.getUser().getEmail() :
@@ -190,7 +187,7 @@ public class AdminNotificationServiceImpl implements AdminNotificationService {
             log.info("Admin notification sent for abandoned cart: {}", cart.getId());
             return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
-            log.error("Failed to send admin notification for abandoned cart: {}", cart.getId(), e);
+            log.error("Failed to send admin notification for abandoned cart: {}", cartId, e);
             return CompletableFuture.failedFuture(e);
         }
     }
