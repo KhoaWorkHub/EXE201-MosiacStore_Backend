@@ -1,5 +1,5 @@
 -- Create chat_rooms table
-CREATE TABLE chat_rooms (
+CREATE TABLE IF NOT EXISTS chat_rooms (
                             room_id UUID PRIMARY KEY,
                             name VARCHAR(100),
                             type VARCHAR(20) NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE chat_rooms (
 );
 
 -- Create chat_room_participants table (junction table)
-CREATE TABLE chat_room_participants (
+CREATE TABLE IF NOT EXISTS chat_room_participants (
                                         room_id UUID NOT NULL,
                                         user_id UUID NOT NULL,
                                         PRIMARY KEY (room_id, user_id),
@@ -18,7 +18,7 @@ CREATE TABLE chat_room_participants (
 );
 
 -- Create chat_messages table
-CREATE TABLE chat_messages (
+CREATE TABLE IF NOT EXISTS chat_messages (
                                message_id UUID PRIMARY KEY,
                                room_id UUID NOT NULL,
                                sender_id UUID,
@@ -34,7 +34,7 @@ CREATE TABLE chat_messages (
 );
 
 -- Create message_read_statuses table
-CREATE TABLE message_read_statuses (
+CREATE TABLE IF NOT EXISTS message_read_statuses (
                                        read_status_id UUID PRIMARY KEY,
                                        message_id UUID NOT NULL,
                                        user_id UUID NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE message_read_statuses (
 );
 
 -- Create chat_attachments table
-CREATE TABLE chat_attachments (
+CREATE TABLE IF NOT EXISTS chat_attachments (
                                   attachment_id UUID PRIMARY KEY,
                                   message_id UUID NOT NULL,
                                   file_url VARCHAR(512) NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE chat_attachments (
 );
 
 -- Create notifications table
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
                                notification_id UUID PRIMARY KEY,
                                user_id UUID NOT NULL,
                                title VARCHAR(200) NOT NULL,

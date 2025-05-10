@@ -5,5 +5,8 @@ public enum NotificationType {
     SYSTEM,
     ORDER_STATUS,
     PAYMENT,
-    SUPPORT_REQUEST
+    SUPPORT_REQUEST,
+    NEW_ORDER,
+    CART_ACTIVITY,
+    ABANDONED_CART
 }

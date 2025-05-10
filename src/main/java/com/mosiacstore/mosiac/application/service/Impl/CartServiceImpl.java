@@ -5,6 +5,7 @@ import com.mosiacstore.mosiac.application.dto.response.CartResponse;
 import com.mosiacstore.mosiac.application.exception.EntityNotFoundException;
 import com.mosiacstore.mosiac.application.exception.InvalidOperationException;
 import com.mosiacstore.mosiac.application.mapper.CartMapper;
+import com.mosiacstore.mosiac.application.service.AdminNotificationService;
 import com.mosiacstore.mosiac.application.service.CartService;
 import com.mosiacstore.mosiac.domain.cart.Cart;
 import com.mosiacstore.mosiac.domain.cart.CartItem;
@@ -39,6 +40,8 @@ public class CartServiceImpl implements CartService {
     private final ProductVariantRepository variantRepository;
     private final UserRepository userRepository;
     private final CartMapper cartMapper;
+    private final AdminNotificationService adminNotificationService;
+
 
     private static final int CART_EXPIRATION_DAYS = 7;
 
@@ -110,9 +113,12 @@ public class CartServiceImpl implements CartService {
                 })
                 .findFirst();
 
+        String activityMessage;
+
         if (existingItem.isPresent()) {
             // Update quantity of existing item
             CartItem item = existingItem.get();
+            int oldQuantity = item.getQuantity();
             int newQuantity = item.getQuantity() + request.getQuantity();
 
             // Check stock again for combined quantity
@@ -122,6 +128,8 @@ public class CartServiceImpl implements CartService {
 
             item.setQuantity(newQuantity);
             cartItemRepository.save(item);
+
+            activityMessage = "updated quantity of " + product.getName() + " from " + oldQuantity + " to " + newQuantity;
         } else {
             // Create new cart item
             CartItem newItem = new CartItem();
@@ -140,12 +148,17 @@ public class CartServiceImpl implements CartService {
             newItem.setAddedAt(LocalDateTime.now());
             cart.getItems().add(newItem);
             cartItemRepository.save(newItem);
+
+            activityMessage = "added " + request.getQuantity() + " of " + product.getName() + " to cart";
         }
 
         // Update cart expiration
         cart.setExpiredAt(LocalDateTime.now().plusDays(CART_EXPIRATION_DAYS));
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(cart);
+
+        // Send admin notification asynchronously
+        adminNotificationService.notifyCartActivity(cart, activityMessage, cart.getItems().size());
 
         return cartMapper.toCartResponse(cart);
     }
