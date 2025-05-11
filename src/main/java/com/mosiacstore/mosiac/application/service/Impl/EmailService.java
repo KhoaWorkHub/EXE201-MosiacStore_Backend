@@ -7,6 +7,7 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -44,16 +46,41 @@ public class EmailService {
      */
     @Async
     public CompletableFuture<Void> sendOrderConfirmationEmail(Order order) {
-        String subject = "Your Order #" + order.getOrderNumber() + " has been received";
-        String template = "order-confirmation";
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("order", order);
-        variables.put("frontendUrl", frontendUrl);
-        variables.put("supportEmail", "support@mosiacstore.com");
-        variables.put("contactPhone", "+84 788-732-514");
+            helper.setFrom(senderEmail);
+            helper.setTo(order.getUser().getEmail());
+            helper.setSubject("Your Order #" + order.getOrderNumber() + " has been received");
 
-        return sendEmailWithTemplate(order.getUser().getEmail(), subject, template, variables);
+            // Add template variables
+            Context context = new Context(Locale.getDefault());
+            context.setVariable("order", order);
+            context.setVariable("frontendUrl", frontendUrl);
+            context.setVariable("supportEmail", "support@mosiacstore.com");
+            context.setVariable("contactPhone", "+84 788-732-514");
+
+            // Handle payment
+            if (order.getPayments() != null && !order.getPayments().isEmpty()) {
+                context.setVariable("payment", order.getPayments().iterator().next());
+            }
+
+            // Process template
+            String htmlContent = templateEngine.process("emails/order-confirmation", context);
+            helper.setText(htmlContent, true);
+
+            // Add the logo as an inline attachment
+            FileSystemResource logo = new FileSystemResource(new File("src/main/resources/static/images/logo.png"));
+            helper.addInline("logoImage", logo);
+
+            mailSender.send(mimeMessage);
+            log.info("Order confirmation email sent to {}", order.getUser().getEmail());
+            return CompletableFuture.completedFuture(null);
+        } catch (MessagingException e) {
+            log.error("Failed to send order confirmation email", e);
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     /**
