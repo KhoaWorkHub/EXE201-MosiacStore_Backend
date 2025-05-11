@@ -232,9 +232,7 @@ public class CartServiceImpl implements CartService {
     public void clearCart(UUID userId, String guestId) {
         Cart cart = findCart(userId, guestId);
 
-        // Delete all items
-        cartItemRepository.deleteAll(cart.getItems());
-        cart.setItems(new HashSet<>());
+        cart.getItems().clear();
 
         // Update cart
         cart.setExpiredAt(LocalDateTime.now().plusDays(CART_EXPIRATION_DAYS));
