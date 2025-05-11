@@ -3,7 +3,6 @@ package com.mosiacstore.mosiac.web.controller;
 import com.mosiacstore.mosiac.application.dto.request.CartItemRequest;
 import com.mosiacstore.mosiac.application.dto.response.ApiResponse;
 import com.mosiacstore.mosiac.application.dto.response.CartResponse;
-import com.mosiacstore.mosiac.application.service.AdminNotificationService;
 import com.mosiacstore.mosiac.application.service.CartService;
 import com.mosiacstore.mosiac.infrastructure.security.CustomUserDetail;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,7 +22,6 @@ import java.util.UUID;
 public class CartController {
 
     private final CartService cartService;
-    private final AdminNotificationService adminNotificationService;
 
 
     @Operation(summary = "Get current cart")
