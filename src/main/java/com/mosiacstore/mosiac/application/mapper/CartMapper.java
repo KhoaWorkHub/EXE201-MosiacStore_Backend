@@ -33,6 +33,7 @@ public interface CartMapper {
 
     @Mapping(target = "productName", source = "product.name")
     @Mapping(target = "productId", source = "product.id")
+    @Mapping(target = "productSlug", source = "product.slug")
     @Mapping(target = "productImage", expression = "java(getProductImageUrl(cartItem))")
     @Mapping(target = "variantInfo", expression = "java(getVariantInfo(cartItem))")
     @Mapping(target = "price", source = "priceSnapshot")
