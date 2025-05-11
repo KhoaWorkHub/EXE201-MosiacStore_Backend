@@ -199,7 +199,7 @@
 <body>
 <div class="container">
     <div class="header">
-        <img src="https://mosiacstore.vercel.app/logo.svg" alt="Mosaic Store" />
+        <img src="cid:logoImage" alt="Mosaic Store" />
         <h1>Order Confirmation</h1>
     </div>
 
@@ -267,11 +267,11 @@
             </div>
         </div>
 
-        <div class="section" th:if="${order.payment != null}">
+        <div class="section" th:if="${payment != null}">
             <div class="section-title">Payment Information</div>
             <div class="payment-info">
-                <div><strong>Payment Method:</strong> <span th:text="${order.payment.paymentMethod}">Bank Transfer</span></div>
-                <div th:if="${order.payment.paymentMethod.name() == 'BANK_TRANSFER'}">
+                <div><strong>Payment Method:</strong> <span th:text="${payment.paymentMethod}">Bank Transfer</span></div>
+                <div th:if="${payment.paymentMethod.name() == 'BANK_TRANSFER'}">
                     <p>Please transfer the payment to the following account:</p>
                     <div><strong>Bank:</strong> MOMO</div>
                     <div><strong>Account Number:</strong> 0788732514</div>

@@ -1,5 +1,6 @@
 package com.mosiacstore.mosiac.infrastructure.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.ResourceBundleMessageSource;
@@ -50,22 +51,25 @@ public class EmailConfig {
      * These can be overridden by application.yml settings
      */
     @Bean
-    public JavaMailSender mailSender() {
+    public JavaMailSender mailSender(
+            @Value("${spring.mail.host}") String host,
+            @Value("${spring.mail.port}") int port,
+            @Value("${spring.mail.username}") String username,
+            @Value("${spring.mail.password}") String password
+    ) {
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+        mailSender.setHost(host);
+        mailSender.setPort(port);
+        mailSender.setUsername(username);
+        mailSender.setPassword(password);
 
-        // Default values (these will be overridden by application.yml)
-        mailSender.setHost("localhost");
-        mailSender.setPort(1025); // MailHog default port
-
-        // Enable debug logging for mail issues (especially useful in development)
-        Properties javaMailProperties = new Properties();
-        javaMailProperties.put("mail.debug", "true");
-        javaMailProperties.put("mail.smtp.ssl.trust", "*");
-        javaMailProperties.put("mail.smtp.connectiontimeout", "5000");
-        javaMailProperties.put("mail.smtp.timeout", "5000");
-        javaMailProperties.put("mail.smtp.writetimeout", "5000");
-
-        mailSender.setJavaMailProperties(javaMailProperties);
+        Properties props = mailSender.getJavaMailProperties();
+        props.put("mail.debug", "true");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.connectiontimeout", "5000");
+        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.smtp.writetimeout", "5000");
 
         return mailSender;
     }
