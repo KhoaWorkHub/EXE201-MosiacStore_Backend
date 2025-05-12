@@ -43,10 +43,12 @@ Paste the following content:
 
 ```yaml
 version: '3.8'
+
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: vietshirt-qr-postgres
+    container_name: vietshirt-postgres
     environment:
       POSTGRES_USER: vietshirt
       POSTGRES_PASSWORD: vietshirt_password
@@ -61,11 +63,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - mosiac-network
+      - vietshirt-network
 
+  # MinIO Object Storage
   minio:
     image: minio/minio
-    container_name: vietshirt-qr-minio
+    container_name: vietshirt-minio
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -76,48 +79,37 @@ services:
     volumes:
       - minio_data:/data
     networks:
-      - mosiac-network
+      - vietshirt-network
 
-  mailhog:
-    image: mailhog/mailhog
-    platform: linux/amd64
-    container_name: vietshirt-qr-mailhog
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-    networks:
-      - mosiac-network
-
+  # Spring Boot Application từ Docker Hub
   app:
     image: khoa2486/vietshirt-qr:latest
-    container_name: vietshirt-qr-app
+    container_name: vietshirt-app
     depends_on:
       postgres:
         condition: service_healthy
       minio:
         condition: service_started
+    ports:
+      - "8080:8080"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/vietshirt_db
       - SPRING_DATASOURCE_USERNAME=vietshirt
       - SPRING_DATASOURCE_PASSWORD=vietshirt_password
-      - SPRING_MAIL_HOST=mailhog
-      - SPRING_MAIL_PORT=1025
-      - STORAGE_TYPE=minio
-      - STORAGE_MINIO_ENDPOINT=http://minio:9000
-      - STORAGE_MINIO_ACCESS_KEY=minio_user
-      - STORAGE_MINIO_SECRET_KEY=minio_password
-    ports:
-      - "8080:8080"
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minio_user
+      - MINIO_SECRET_KEY=minio_password
     networks:
-      - mosiac-network
+      - vietshirt-network
 
 networks:
-  mosiac-network:
+  vietshirt-network:
     driver: bridge
 
 volumes:
   postgres_data:
   minio_data:
+
 ✅ Step 2: Open Terminal or PowerShell
 In that folder (where docker-compose.yml is saved):
 
