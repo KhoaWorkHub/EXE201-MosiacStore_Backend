@@ -19,6 +19,7 @@ import com.mosiacstore.mosiac.domain.qrcode.QRScan;
 import com.mosiacstore.mosiac.domain.region.Region;
 import com.mosiacstore.mosiac.infrastructure.repository.*;
 import com.mosiacstore.mosiac.infrastructure.service.MinioService;
+import com.mosiacstore.mosiac.infrastructure.service.StorageServiceDelegate;
 import com.mosiacstore.mosiac.infrastructure.util.MockMultipartFile;
 import com.mosiacstore.mosiac.infrastructure.util.QRCodeGenerator;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +53,7 @@ public class ProductServiceImpl implements ProductService {
     private final QRScanRepository qrScanRepository;
     private final QRCodeGenerator qrCodeGenerator;
     private final ProductMapper productMapper;
-    private final MinioService minioService;
+    private final StorageServiceDelegate storageServiceDelegate;
     private final SlugService slugService;
 
     @Override
@@ -183,7 +184,7 @@ public class ProductServiceImpl implements ProductService {
         for (ProductImage image : images) {
             if (image.getImageUrl() != null && !image.getImageUrl().isEmpty()) {
                 try {
-                    minioService.deleteFile(image.getImageUrl());
+                    storageServiceDelegate.deleteFile(image.getImageUrl());
                 } catch (Exception e) {
                     log.warn("Failed to delete image file: {}", image.getImageUrl(), e);
                 }
@@ -204,7 +205,7 @@ public class ProductServiceImpl implements ProductService {
 
         for (MultipartFile file : files) {
             try {
-                String imageUrl = minioService.uploadFile(file, "products");
+                String imageUrl = storageServiceDelegate.uploadFile(file, "products");
                 ProductImage image = new ProductImage();
                 image.setProduct(product);
                 image.setImageUrl(imageUrl);
@@ -238,7 +239,7 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new EntityNotFoundException("Product image not found with ID: " + imageId));
         if (image.getImageUrl() != null && !image.getImageUrl().isEmpty()) {
             try {
-                minioService.deleteFile(image.getImageUrl());
+                storageServiceDelegate.deleteFile(image.getImageUrl());
             } catch (Exception e) {
                 log.warn("Failed to delete image file: {}", image.getImageUrl(), e);
             }
@@ -403,7 +404,7 @@ public class ProductServiceImpl implements ProductService {
                     "image/png",
                     qrImageBytes
             );
-            String imageUrl = minioService.uploadFile(multipartFile, "qrcodes");
+            String imageUrl = storageServiceDelegate.uploadFile(multipartFile, "qrcodes");
 
             // Create QR code entity
             QRCode qrCode = new QRCode();
@@ -468,7 +469,7 @@ public class ProductServiceImpl implements ProductService {
         // Delete QR image from MinIO if exists
         if (qrCode.getQrImageUrl() != null && !qrCode.getQrImageUrl().isEmpty()) {
             try {
-                minioService.deleteFile(qrCode.getQrImageUrl());
+                storageServiceDelegate.deleteFile(qrCode.getQrImageUrl());
             } catch (Exception e) {
                 log.warn("Failed to delete QR code image file: {}", qrCode.getQrImageUrl(), e);
             }

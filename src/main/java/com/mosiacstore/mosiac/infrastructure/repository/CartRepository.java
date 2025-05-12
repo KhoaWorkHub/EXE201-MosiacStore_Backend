@@ -18,6 +18,8 @@ public interface CartRepository extends JpaRepository<Cart, UUID> {
 
     Optional<Cart> findByGuestId(String guestId);
 
+    List<Cart> findAllByUserIdOrderByUpdatedAtDesc(UUID userId);
+
     @Query("SELECT c FROM Cart c WHERE c.expiredAt < :now")
     List<Cart> findExpiredCarts(@Param("now") LocalDateTime now);
 
