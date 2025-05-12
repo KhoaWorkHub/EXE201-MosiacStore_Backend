@@ -14,6 +14,7 @@ import com.mosiacstore.mosiac.domain.notification.NotificationType;
 import com.mosiacstore.mosiac.domain.user.User;
 import com.mosiacstore.mosiac.infrastructure.repository.*;
 import com.mosiacstore.mosiac.infrastructure.service.MinioService;
+import com.mosiacstore.mosiac.infrastructure.service.StorageServiceDelegate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -39,7 +40,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final UserRepository userRepository;
     private final MessageReadStatusRepository readStatusRepository;
     private final ChatAttachmentRepository attachmentRepository;
-    private final MinioService minioService;
+    private final StorageServiceDelegate storageServiceDelegate;
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatMapper chatMapper;
     private final NotificationService notificationService;
@@ -395,9 +396,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         // Delete attachments first
         for (ChatAttachment attachment : message.getAttachments()) {
             try {
-                minioService.deleteFile(attachment.getFileUrl());
+                storageServiceDelegate.deleteFile(attachment.getFileUrl());
                 if (attachment.getThumbnailUrl() != null) {
-                    minioService.deleteFile(attachment.getThumbnailUrl());
+                    storageServiceDelegate.deleteFile(attachment.getThumbnailUrl());
                 }
             } catch (Exception e) {
                 log.warn("Failed to delete attachment file: {}", attachment.getFileUrl(), e);
@@ -494,7 +495,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         // Upload file to MinIO
         String fileUrl;
         try {
-            fileUrl = minioService.uploadFile(file, "chat");
+            fileUrl = storageServiceDelegate.uploadFile(file, "chat");
         } catch (Exception e) {
             log.error("Failed to upload file for chat message", e);
             throw new RuntimeException("Failed to upload attachment: " + e.getMessage());

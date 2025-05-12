@@ -7,6 +7,7 @@ import com.mosiacstore.mosiac.application.dto.response.PageResponse;
 import com.mosiacstore.mosiac.application.service.CategoryService;
 import com.mosiacstore.mosiac.infrastructure.security.CustomUserDetail;
 import com.mosiacstore.mosiac.infrastructure.service.MinioService;
+import com.mosiacstore.mosiac.infrastructure.service.StorageServiceDelegate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,7 +31,7 @@ import java.util.UUID;
 public class CategoryController {
 
     private final CategoryService categoryService;
-    private final MinioService minioService;
+    private final StorageServiceDelegate storageServiceDelegate;
 
     @Operation(summary = "Get all categories with pagination")
     @GetMapping("/categories")
@@ -68,7 +69,7 @@ public class CategoryController {
             @AuthenticationPrincipal CustomUserDetail currentUser) {
 
         if (request.getFile() != null && !request.getFile().isEmpty()) {
-            String url = minioService.uploadFile(request.getFile(), "categories");
+            String url = storageServiceDelegate.uploadFile(request.getFile(), "categories");
             request.setImageUrl(url);
         }
 
@@ -98,7 +99,7 @@ public class CategoryController {
 
         String newImageUrl = null;
         if (file != null && !file.isEmpty()) {
-            newImageUrl = minioService.uploadFile(file, "categories");
+            newImageUrl = storageServiceDelegate.uploadFile(file, "categories");
         } else {
             newImageUrl = imageUrl;
         }

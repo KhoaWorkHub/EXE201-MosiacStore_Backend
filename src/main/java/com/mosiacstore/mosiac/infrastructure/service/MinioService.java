@@ -2,30 +2,36 @@ package com.mosiacstore.mosiac.infrastructure.service;
 
 import com.mosiacstore.mosiac.infrastructure.config.MinioConfig;
 import io.minio.*;
-import io.minio.errors.*;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class MinioService {
+public class MinioService implements StorageService {
     private final MinioClient minioClient;
     private final MinioConfig minioConfig;
 
+    @Value("${storage.type:minio}")
+    private String storageType;
+
     @PostConstruct
     public void setupBucket() {
+        // Skip MinIO setup if using S3
+        if ("s3".equals(storageType)) {
+            log.info("Using AWS S3 for storage, skipping MinIO bucket setup");
+            return;
+        }
+
         try {
-            // Check if bucket exists
+            // Your existing MinIO setup code
             boolean bucketExists = minioClient.bucketExists(BucketExistsArgs.builder()
                     .bucket(minioConfig.getBucket())
                     .build());
