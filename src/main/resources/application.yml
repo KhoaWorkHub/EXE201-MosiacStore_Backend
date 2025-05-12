@@ -1,25 +1,20 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/vietshirt_db
-    username: vietshirt
-    password: vietshirt_password
-
-#  datasource:
-#    url: jdbc:postgresql://localhost:5432/vietshirt_db
-#    username: postgres
-#    password: khoa2486
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:vietshirt_db}
+    username: ${DB_USERNAME:vietshirt}
+    password: ${DB_PASSWORD:vietshirt_password}
   jpa:
     hibernate:
-      ddl-auto: validate # Use migrations instead of auto-generation
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: tkhoa7815@gmail.com
-    password: wgph gecm vlcc wcwt
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
@@ -30,7 +25,6 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
-  # Async task execution for notifications and emails
   task:
     execution:
       pool:
@@ -44,38 +38,50 @@ spring:
       client:
         registration:
           google:
-            client-id: 555689664668-aj5km7b0atsenvt6drksupnkq2kq649n.apps.googleusercontent.com
-            client-secret: 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
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
             scope:
               - email
               - profile
-            redirect-uri: http://localhost:8080/login/oauth2/code/google
+            redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/login/oauth2/code/google}
 
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
 
+# Storage configuration
+storage:
+  type: ${STORAGE_TYPE:minio}
+
 # MinIO configuration
 minio:
-  endpoint: localhost:9000
-  access-key: minio_user
-  secret-key: minio_password
-  bucket: mosaic
-  secure: false
+  endpoint: ${MINIO_ENDPOINT:localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minio_user}
+  secret-key: ${MINIO_SECRET_KEY:minio_password}
+  bucket: ${MINIO_BUCKET:mosaic}
+  secure: ${MINIO_SECURE:false}
+
+# AWS S3 configuration
+aws:
+  s3:
+    region: ${AWS_REGION:ap-southeast-1}
+    access-key: ${AWS_ACCESS_KEY}
+    secret-key: ${AWS_SECRET_KEY}
+    bucket: ${AWS_S3_BUCKET:khoas3bucket}
 
 application:
   security:
     jwt:
-      secret-key: ${JWT_SECRET:de07e529803afed066821cb3117a11fd258e41c990b2fc4018ae7d477c6717c18dcc0b3a978b5d52754b9621d666be8b80913ec5cf4a95cdca5227a4b373e665b0ad47e88f87276d6ecf80bf2e954084b9f8854ab3903021f0487fa869203afa91b2021f6138a40eefb1647cfff32e49ed8cce0c63a1028f03b6930117e5f2095beecb4cd2e45e9c2db3c9396ff9c9878ca30df498dc8f852825e4e761072e60cae08cd6abe338a13c533db3728cfe07c5eaafbad9e41a5ccad77179dedba0a3d6b511a10a50e81c62a25a5fbca3fd8264ec29348771975ba25527f01c5795c32f71ff9fde6d3d512e95006bcd59ad1e7476a007123d021af84a3eb2a56cae82cb2ce21ad6397c99902a9ce2cbc3ad41fd0bb2b5d4be6cf62ef7a49f2f10338d08c6abb80279e12e7e2a09e273365fe2bd2a5aeeca4dfa0c09a1e037e2bd6d88028dba3b26f45d8f8fceace0de83399965b81565855989460c21d3945aa4bde63c40abc87900e834264199d3eb8918d400a4ce229ab82d8214d8a59d8f9f8ff823ccd37da2e30f559b14d57ce1d878c4cb6d7725ea50ddb1e253d99958cd860f0ea6961d2dfdb9daee3fa6b989bd7fee64b6cb3478fe35633dfb13aa70e9034ffbe0869d170e4c24b34a140d04a98be1d23853b06314012a760c98bc420f2d19a91ac35b9efc8effd1168cf5f4b1700ce11b6176c21fb301e3a3aa0d67332351}
-      expiration: 86400000  # 1 day (milliseconds)
-      refresh-expiration: 604800000  # 7 days (milliseconds)
-  front-end-url: https://mosiacstore.vercel.app
+      secret-key: ${JWT_SECRET}
+      expiration: ${JWT_EXPIRATION:86400000}
+      refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  front-end-url: ${FRONTEND_URL:https://mosiacstore.vercel.app}
 
 vnpay:
-  version: 2.1.0
-  tmnCode: WMOO9ELW
-  hashSecret: GARFTFBGDVEAGDBVZ67L6I6BPPP0GJ9V
-  paymentUrl: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-  returnUrl: http://localhost:8080/api/v1/payment/vnpay/payment-callback  # Your frontend callback URL
-  apiUrl: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction  # Sandbox API URL
+  version: ${VNPAY_VERSION:2.1.0}
+  tmnCode: ${VNPAY_TMN_CODE}
+  hashSecret: ${VNPAY_HASH_SECRET}
+  paymentUrl: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  returnUrl: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment/vnpay/payment-callback}
+  apiUrl: ${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}

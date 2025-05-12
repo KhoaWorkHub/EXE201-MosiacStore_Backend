@@ -7,6 +7,7 @@ import com.mosiacstore.mosiac.application.dto.response.RegionResponse;
 import com.mosiacstore.mosiac.application.service.RegionService;
 import com.mosiacstore.mosiac.infrastructure.security.CustomUserDetail;
 import com.mosiacstore.mosiac.infrastructure.service.MinioService;
+import com.mosiacstore.mosiac.infrastructure.service.StorageServiceDelegate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,7 +31,7 @@ import java.util.UUID;
 public class RegionController {
 
     private final RegionService regionService;
-    private final MinioService minioService;
+    private final StorageServiceDelegate storageServiceDelegate;
 
     @Operation(summary = "Get all regions with pagination")
     @GetMapping("/regions")
@@ -63,7 +64,7 @@ public class RegionController {
             @AuthenticationPrincipal CustomUserDetail currentUser
     ) {
         if (request.getFile() != null && !request.getFile().isEmpty()) {
-            String url = minioService.uploadFile(request.getFile(), "regions");
+            String url = storageServiceDelegate.uploadFile(request.getFile(), "regions");
             request.setImageUrl(url);
         }
         RegionResponse created = regionService.createRegion(request);
@@ -88,7 +89,7 @@ public class RegionController {
     ) {
         String newImageUrl = null;
         if (file != null && !file.isEmpty()) {
-            newImageUrl = minioService.uploadFile(file, "regions");
+            newImageUrl = storageServiceDelegate.uploadFile(file, "regions");
         } else {
             newImageUrl = imageUrl;
         }

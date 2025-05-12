@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -41,7 +42,6 @@ public class CartServiceImpl implements CartService {
     private final UserRepository userRepository;
     private final CartMapper cartMapper;
     private final AdminNotificationService adminNotificationService;
-
 
     private static final int CART_EXPIRATION_DAYS = 7;
 
@@ -255,14 +255,38 @@ public class CartServiceImpl implements CartService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + userId));
 
-        Cart userCart = cartRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    Cart newCart = new Cart();
-                    newCart.setUser(user);
-                    newCart.setExpiredAt(LocalDateTime.now().plusDays(CART_EXPIRATION_DAYS));
-                    newCart.setItems(new HashSet<>());
-                    return cartRepository.save(newCart);
-                });
+        // FIXED: Get all user carts and select the most recent one
+        List<Cart> userCarts = cartRepository.findAllByUserIdOrderByUpdatedAtDesc(userId);
+        Cart userCart;
+
+        if (!userCarts.isEmpty()) {
+            // Use the most recent cart
+            userCart = userCarts.get(0);
+
+            // Delete any additional duplicate carts
+            if (userCarts.size() > 1) {
+                log.info("Found {} duplicate carts for user {}. Keeping most recent one and deleting others.",
+                        userCarts.size(), userId);
+
+                for (int i = 1; i < userCarts.size(); i++) {
+                    Cart duplicateCart = userCarts.get(i);
+                    // Move any items from duplicate carts to the main cart
+                    for (CartItem item : duplicateCart.getItems()) {
+                        item.setCart(userCart);
+                        cartItemRepository.save(item);
+                    }
+                    duplicateCart.getItems().clear();
+                    cartRepository.delete(duplicateCart);
+                }
+            }
+        } else {
+            // Create new cart if none exists
+            userCart = new Cart();
+            userCart.setUser(user);
+            userCart.setExpiredAt(LocalDateTime.now().plusDays(CART_EXPIRATION_DAYS));
+            userCart.setItems(new HashSet<>());
+            userCart = cartRepository.save(userCart);
+        }
 
         // Find guest cart
         Cart guestCart = cartRepository.findByGuestId(guestId)
@@ -365,9 +389,18 @@ public class CartServiceImpl implements CartService {
             throw new InvalidOperationException("Either user ID or guest ID must be provided");
         }
 
-        // Try to find by user ID
+        // FIXED: Try to find by user ID - get the most recent cart if multiple exist
         if (userId != null) {
-            return cartRepository.findByUserId(userId).orElse(null);
+            List<Cart> userCarts = cartRepository.findAllByUserIdOrderByUpdatedAtDesc(userId);
+            if (!userCarts.isEmpty()) {
+                // If there are multiple carts, log a warning
+                if (userCarts.size() > 1) {
+                    log.warn("Found {} carts for user {}. Using the most recently updated one.",
+                            userCarts.size(), userId);
+                }
+                return userCarts.get(0);
+            }
+            return null;
         }
 
         // Try to find by guest ID
