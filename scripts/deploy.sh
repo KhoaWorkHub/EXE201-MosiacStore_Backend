@@ -29,21 +29,39 @@ log "Bắt đầu quá trình triển khai zero-downtime..."
 
 # Xác định trạng thái hiện tại
 cd $APP_DIR
-CURRENT_PORT=$(docker ps --filter "name=vietshirt-app" --format "{{.Ports}}" | grep -o "0.0.0.0:[0-9]*->8080" | cut -d ":" -f2 | cut -d "-" -f1 || echo $BLUE_PORT)
+RUNNING_CONTAINER=$(docker ps --format "{{.Names}}" | grep -E "vietshirt-app(-green)?$" || echo "")
 
-# Xác định cấu hình mới
-if [ "$CURRENT_PORT" = "$BLUE_PORT" ]; then
-  NEW_PORT=$GREEN_PORT
-  NEW_CONTAINER=$GREEN_CONTAINER
-  CURRENT_CONTAINER=$BLUE_CONTAINER
+if [ -n "$RUNNING_CONTAINER" ]; then
+  # Container đang chạy, lấy port
+  CURRENT_PORT=$(docker ps --filter "name=$RUNNING_CONTAINER" --format "{{.Ports}}" | grep -o "0.0.0.0:[0-9]*->8080" | cut -d ":" -f2 | cut -d "-" -f1)
+
+  # Xác định container name
+  if [ "$RUNNING_CONTAINER" = "vietshirt-app" ]; then
+    CURRENT_CONTAINER=$BLUE_CONTAINER
+    NEW_CONTAINER=$GREEN_CONTAINER
+    NEW_PORT=$GREEN_PORT
+  else
+    CURRENT_CONTAINER=$GREEN_CONTAINER
+    NEW_CONTAINER=$BLUE_CONTAINER
+    NEW_PORT=$BLUE_PORT
+  fi
 else
-  NEW_PORT=$BLUE_PORT
+  # Không có container nào đang chạy
+  CURRENT_CONTAINER=""
+  CURRENT_PORT=""
   NEW_CONTAINER=$BLUE_CONTAINER
-  CURRENT_CONTAINER=$GREEN_CONTAINER
+  NEW_PORT=$BLUE_PORT
 fi
 
-log "Trạng thái hiện tại: Container $CURRENT_CONTAINER đang chạy trên port $CURRENT_PORT"
-log "Triển khai mới: Container $NEW_CONTAINER sẽ chạy trên port $NEW_PORT"
+# Đảm bảo CURRENT_PORT luôn có giá trị
+if [ -z "$CURRENT_PORT" ]; then
+  if [ "$NEW_PORT" = "8080" ]; then
+    CURRENT_PORT=8081
+  else
+    CURRENT_PORT=8080
+  fi
+  log "CURRENT_PORT không xác định, sử dụng giá trị mặc định: $CURRENT_PORT"
+fi
 
 # Tạo file .env mới cho container mới
 cat > .env.new << EOL
@@ -88,6 +106,28 @@ fi
 
 # Cập nhật cấu hình Nginx
 log "Cập nhật cấu hình Nginx để chuyển lưu lượng..."
+
+# Đảm bảo CURRENT_PORT luôn có giá trị
+if [ -z "$CURRENT_PORT" ]; then
+  # Nếu CURRENT_PORT trống, gán giá trị mặc định
+  if [ "$NEW_PORT" = "8080" ]; then
+    CURRENT_PORT=8081
+  else
+    CURRENT_PORT=8080
+  fi
+  log "CURRENT_PORT không xác định, sử dụng giá trị mặc định: $CURRENT_PORT"
+fi
+
+echo "$NGINX_CONFIG" > /tmp/nginx-test.conf
+RESULT=$(sudo nginx -t -c /tmp/nginx-test.conf 2>&1 || echo "NGINX CONFIG ERROR")
+
+if [[ "$RESULT" == *"NGINX CONFIG ERROR"* ]]; then
+  log "LỖI: Cấu hình Nginx không hợp lệ:"
+  echo "$NGINX_CONFIG"
+  log "Hủy triển khai..."
+  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker-compose --env-file .env.new down
+  exit 1
+fi
 
 NGINX_CONFIG="# Định nghĩa upstream backend
 upstream vietshirt_backend {
