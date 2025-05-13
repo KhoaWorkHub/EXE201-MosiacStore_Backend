@@ -74,11 +74,11 @@ EOL
 
 # Pull image mới nhất
 log "Pulling latest image..."
-docker-compose pull
+docker compose pull
 
 # Khởi động container mới
 log "Starting new container $NEW_CONTAINER on port $NEW_PORT..."
-HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker-compose --env-file .env.new up -d
+HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new up -d
 
 # Kiểm tra health của container mới
 log "Kiểm tra sức khỏe của container mới..."
@@ -100,7 +100,7 @@ done
 # Kiểm tra kết quả health check
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
   log "LỖI: Container mới không vượt qua kiểm tra sức khỏe. Đang hủy triển khai..."
-  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker-compose --env-file .env.new down
+  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
   exit 1
 fi
 
@@ -125,7 +125,7 @@ if [[ "$RESULT" == *"NGINX CONFIG ERROR"* ]]; then
   log "LỖI: Cấu hình Nginx không hợp lệ:"
   echo "$NGINX_CONFIG"
   log "Hủy triển khai..."
-  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker-compose --env-file .env.new down
+  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
   exit 1
 fi
 
@@ -191,7 +191,7 @@ if [ $? -eq 0 ]; then
   sudo systemctl reload nginx
 else
   log "LỖI: Cấu hình Nginx không hợp lệ. Đang hủy triển khai..."
-  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker-compose --env-file .env.new down
+  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
   exit 1
 fi
 
@@ -204,6 +204,6 @@ sleep 30
 
 # Dừng container cũ
 log "Dừng container cũ ($CURRENT_CONTAINER)..."
-HOST_PORT=$CURRENT_PORT CONTAINER_NAME=$CURRENT_CONTAINER docker-compose down
+HOST_PORT=$CURRENT_PORT CONTAINER_NAME=$CURRENT_CONTAINER docker compose down
 
 log "Triển khai hoàn tất thành công! Ứng dụng đang chạy trên container $NEW_CONTAINER, port $NEW_PORT"
