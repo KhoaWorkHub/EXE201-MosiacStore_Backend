@@ -69,8 +69,8 @@ RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   HEALTH_STATUS=$(check_health $NEW_PORT)
 
-  if [ "$HEALTH_STATUS" = "200" ]; then
-    log "Container mới hoạt động tốt!"
+  if [ "$HEALTH_STATUS" = "200" ] || [ "$HEALTH_STATUS" = "302" ]; then
+    log "Container mới hoạt động tốt! (Status: $HEALTH_STATUS)"
     break
   fi
 
