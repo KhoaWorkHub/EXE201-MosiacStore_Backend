@@ -31,9 +31,6 @@ jobs:
 
       - name: Build with Maven
         run: mvn -B clean package -DskipTests=true --file pom.xml
-# Later integrate CI with SonarCloud
-#      - name: Run tests
-#        run: mvn test --file pom.xml
 
       - name: SonarCloud Scan
         env:
@@ -41,7 +38,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
           SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
-        run: | 
+        run: |
           mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
           -DskipTests=true \
           -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
@@ -86,3 +83,27 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/vietshirt-qr:latest
+
+  deploy:
+    needs: docker
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'  # Chỉ triển khai từ nhánh main
+
+    steps:
+      - uses: actions/checkout@v3  # Lấy repo để truy cập các script
+
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
+          chmod 600 ~/.ssh/ec2_key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy deployment scripts to server
+        run: |
+          chmod +x scripts/deploy.sh scripts/setup_prerequisites.sh
+          scp -i ~/.ssh/ec2_key.pem scripts/deploy.sh scripts/setup_prerequisites.sh ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:~/
+
+      - name: Setup prerequisites and deploy
+        run: |
+          ssh -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} "bash ~/setup_prerequisites.sh && bash ~/deploy.sh"
