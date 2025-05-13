@@ -168,16 +168,25 @@ server {
     }
 }"
 
-echo "$NGINX_CONFIG" > /tmp/nginx-test.conf
-RESULT=$(sudo nginx -t -c /tmp/nginx-test.conf 2>&1 || echo "NGINX CONFIG ERROR")
+# Phương pháp 2: Sao lưu cấu hình hiện tại trước
+sudo cp $NGINX_CONF ${NGINX_CONF}.backup 2>/dev/null || true
 
-if [[ "$RESULT" == *"NGINX CONFIG ERROR"* ]]; then
+# Tạo tệp cấu hình tạm thời trong thư mục nginx (để đúng context)
+echo "$NGINX_CONFIG" | sudo tee /etc/nginx/sites-available/test-config > /dev/null
+
+# Kiểm tra chi tiết và hiển thị lỗi cụ thể
+RESULT=$(sudo nginx -t -c /etc/nginx/sites-available/test-config 2>&1)
+if [ $? -ne 0 ]; then
   log "LỖI: Cấu hình Nginx không hợp lệ:"
-  echo "$NGINX_CONFIG"
+  echo "$RESULT"  # In ra lỗi thực tế từ nginx
   log "Hủy triển khai..."
+  sudo rm /etc/nginx/sites-available/test-config
   HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
   exit 1
 fi
+
+# Nếu đạt, xóa file test và tiếp tục
+sudo rm /etc/nginx/sites-available/test-config
 
 # Ghi nội dung cấu hình vào file
 echo "$NGINX_CONFIG" | sudo tee $NGINX_CONF > /dev/null
