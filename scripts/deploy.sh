@@ -118,17 +118,6 @@ if [ -z "$CURRENT_PORT" ]; then
   log "CURRENT_PORT không xác định, sử dụng giá trị mặc định: $CURRENT_PORT"
 fi
 
-echo "$NGINX_CONFIG" > /tmp/nginx-test.conf
-RESULT=$(sudo nginx -t -c /tmp/nginx-test.conf 2>&1 || echo "NGINX CONFIG ERROR")
-
-if [[ "$RESULT" == *"NGINX CONFIG ERROR"* ]]; then
-  log "LỖI: Cấu hình Nginx không hợp lệ:"
-  echo "$NGINX_CONFIG"
-  log "Hủy triển khai..."
-  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
-  exit 1
-fi
-
 NGINX_CONFIG="# Định nghĩa upstream backend
 upstream vietshirt_backend {
     server localhost:$NEW_PORT;
@@ -178,6 +167,17 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
     }
 }"
+
+echo "$NGINX_CONFIG" > /tmp/nginx-test.conf
+RESULT=$(sudo nginx -t -c /tmp/nginx-test.conf 2>&1 || echo "NGINX CONFIG ERROR")
+
+if [[ "$RESULT" == *"NGINX CONFIG ERROR"* ]]; then
+  log "LỖI: Cấu hình Nginx không hợp lệ:"
+  echo "$NGINX_CONFIG"
+  log "Hủy triển khai..."
+  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
+  exit 1
+fi
 
 # Ghi nội dung cấu hình vào file
 echo "$NGINX_CONFIG" | sudo tee $NGINX_CONF > /dev/null
