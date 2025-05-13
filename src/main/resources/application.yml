@@ -86,6 +86,7 @@ vnpay:
   returnUrl: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment/vnpay/payment-callback}
   apiUrl: ${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
 
+#Actuator configuration
 management:
   endpoints:
     web:
