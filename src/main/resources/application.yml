@@ -94,15 +94,6 @@ management:
   endpoint:
     health:
       show-details: always
-      show-components: always
-      security:
-        enabled: false
-  health:
-    defaults:
-      enabled: true
-
-  security:
-    ignored: /actuator/**
 
 
 
