@@ -169,35 +169,25 @@ server {
     }
 }"
 
-# Phương pháp 2: Sao lưu cấu hình hiện tại trước
-sudo cp $NGINX_CONF ${NGINX_CONF}.backup 2>/dev/null || true
+# Sao lưu vào thư mục người dùng (không cần sudo)
+mkdir -p ~/nginx-backups
+cat $NGINX_CONF > ~/nginx-backups/vietshirt.backup.$(date +%Y%m%d%H%M%S) 2>/dev/null || true
 
-# Tạo tệp cấu hình tạm thời trong thư mục nginx (để đúng context)
-echo "$NGINX_CONFIG" | sudo tee /etc/nginx/sites-available/test-config > /dev/null
-
-# Kiểm tra chi tiết và hiển thị lỗi cụ thể
-RESULT=$(sudo nginx -t -c /etc/nginx/sites-available/test-config 2>&1)
+# Ghi nội dung cấu hình vào file
 log "Đang cập nhật file cấu hình..."
-if ! echo "$NGINX_CONFIG" | sudo tee $NGINX_CONF > /dev/null 2>&1; then
+if ! echo "$NGINX_CONFIG" | sudo /bin/tee $NGINX_CONF > /dev/null 2>&1; then
   log "LỖI: Không thể ghi vào file cấu hình Nginx. Chi tiết:"
-  echo "$NGINX_CONFIG" | sudo tee $NGINX_CONF 2>&1 || log "Không thể hiển thị lỗi cụ thể"
+  echo "$NGINX_CONFIG" | sudo /bin/tee $NGINX_CONF 2>&1 || log "Không thể hiển thị lỗi cụ thể"
   log "Hủy triển khai..."
   HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
   exit 1
 fi
-# Nếu đạt, xóa file test và tiếp tục
-sudo rm /etc/nginx/sites-available/test-config
-
-# Ghi nội dung cấu hình vào file
-echo "$NGINX_CONFIG" | sudo tee $NGINX_CONF > /dev/null
 
 # Kiểm tra và reload Nginx
 log "Kiểm tra cấu hình Nginx..."
-sudo nginx -t
-
-if [ $? -eq 0 ]; then
+if sudo /usr/sbin/nginx -t; then
   log "Cấu hình Nginx hợp lệ, áp dụng thay đổi..."
-  sudo systemctl reload nginx
+  sudo /bin/systemctl reload nginx
 else
   log "LỖI: Cấu hình Nginx không hợp lệ. Đang hủy triển khai..."
   HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
