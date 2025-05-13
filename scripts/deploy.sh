@@ -106,6 +106,7 @@ fi
 
 # Cập nhật cấu hình Nginx
 log "Cập nhật cấu hình Nginx để chuyển lưu lượng..."
+ls -la $NGINX_CONF 2>&1 || log "Không thể truy cập file cấu hình: $NGINX_CONF"
 
 # Đảm bảo CURRENT_PORT luôn có giá trị
 if [ -z "$CURRENT_PORT" ]; then
@@ -176,15 +177,14 @@ echo "$NGINX_CONFIG" | sudo tee /etc/nginx/sites-available/test-config > /dev/nu
 
 # Kiểm tra chi tiết và hiển thị lỗi cụ thể
 RESULT=$(sudo nginx -t -c /etc/nginx/sites-available/test-config 2>&1)
-if [ $? -ne 0 ]; then
-  log "LỖI: Cấu hình Nginx không hợp lệ:"
-  echo "$RESULT"  # In ra lỗi thực tế từ nginx
+log "Đang cập nhật file cấu hình..."
+if ! echo "$NGINX_CONFIG" | sudo tee $NGINX_CONF > /dev/null 2>&1; then
+  log "LỖI: Không thể ghi vào file cấu hình Nginx. Chi tiết:"
+  echo "$NGINX_CONFIG" | sudo tee $NGINX_CONF 2>&1 || log "Không thể hiển thị lỗi cụ thể"
   log "Hủy triển khai..."
-  sudo rm /etc/nginx/sites-available/test-config
   HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env.new down
   exit 1
 fi
-
 # Nếu đạt, xóa file test và tiếp tục
 sudo rm /etc/nginx/sites-available/test-config
 
