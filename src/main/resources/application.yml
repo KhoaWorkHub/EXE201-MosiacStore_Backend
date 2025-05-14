@@ -43,7 +43,7 @@ spring:
             scope:
               - email
               - profile
-            redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/login/oauth2/code/google}
+            redirect-uri: ${GOOGLE_REDIRECT_URI:http://ec2-54-169-96-88.ap-southeast-1.compute.amazonaws.com/login/oauth2/code/google}
 
   servlet:
     multipart:
@@ -83,7 +83,7 @@ vnpay:
   tmnCode: ${VNPAY_TMN_CODE}
   hashSecret: ${VNPAY_HASH_SECRET}
   paymentUrl: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-  returnUrl: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment/vnpay/payment-callback}
+  returnUrl: ${VNPAY_RETURN_URL:http://ec2-54-169-96-88.ap-southeast-1.compute.amazonaws.com/api/v1/payment/vnpay/payment-callback}
   apiUrl: ${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
 
 #Actuator configurations
