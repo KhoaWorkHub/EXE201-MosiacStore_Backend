@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.DecoderException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -27,6 +28,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
+
+    @Value("${application.front-end-url}")
+    private String frontEndUrl;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -86,6 +90,8 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             throw new RuntimeException(e);
         }
 
-        response.sendRedirect("http://localhost:5173/oauth2/redirect?token=" + token + "&refreshToken=" + refreshToken);
+        //response.sendRedirect("http://localhost:5173/oauth2/redirect?token=" + token + "&refreshToken=" + refreshToken);
+        response.sendRedirect(frontEndUrl + "/oauth2/redirect?token=" + token + "&refreshToken=" + refreshToken);
+
     }
 }
