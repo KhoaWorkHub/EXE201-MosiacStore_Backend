@@ -390,7 +390,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // Create QR data with product ID and timestamp for uniqueness
-        String qrData = "product:" + productId + ":" + System.currentTimeMillis();
+        String qrData = request.getRedirectUrl();
 
         try {
             // Generate QR code image
