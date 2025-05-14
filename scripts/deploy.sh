@@ -206,3 +206,9 @@ log "Dừng container cũ ($CURRENT_CONTAINER)..."
 HOST_PORT=$CURRENT_PORT CONTAINER_NAME=$CURRENT_CONTAINER docker compose down
 
 log "Triển khai hoàn tất thành công! Ứng dụng đang chạy trên container $NEW_CONTAINER, port $NEW_PORT"
+
+if ! docker ps | grep -q "$NEW_CONTAINER"; then
+  log "Phát hiện container không chạy sau khi triển khai, thử khởi động lại..."
+  cd $APP_DIR
+  HOST_PORT=$NEW_PORT CONTAINER_NAME=$NEW_CONTAINER docker compose --env-file .env up -d
+fi
