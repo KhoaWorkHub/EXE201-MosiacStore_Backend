@@ -425,9 +425,11 @@ public class OrderServiceImpl implements OrderService {
 
         Order updatedOrder = orderRepository.save(order);
 
-        // Send email notification for status change
         if (oldStatus != newStatus) {
             switch (newStatus) {
+                case PAID:
+                    emailService.sendOrderPaidEmail(updatedOrder);
+                    break;
                 case PROCESSING:
                     emailService.sendOrderProcessingEmail(updatedOrder);
                     break;
@@ -448,19 +450,33 @@ public class OrderServiceImpl implements OrderService {
         return mapToOrderResponse(updatedOrder);
     }
 
-    // Helper methods
     private void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
-        // Implement business rules for status transitions
-        // For example, can't go from CANCELLED to PROCESSING
-        if (currentStatus == OrderStatus.CANCELLED) {
-            throw new InvalidOperationException("Cannot change status of a cancelled order");
+        Set<OrderStatus> allowedTransitions;
+        switch (currentStatus) {
+            case PENDING_PAYMENT:
+                allowedTransitions = Set.of(OrderStatus.PAID, OrderStatus.CANCELLED);
+                break;
+            case PAID:
+                allowedTransitions = Set.of(OrderStatus.PROCESSING);
+                break;
+            case PROCESSING:
+                allowedTransitions = Set.of(OrderStatus.SHIPPING, OrderStatus.CANCELLED);
+                break;
+            case SHIPPING:
+                allowedTransitions = Set.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
+                break;
+            case DELIVERED:
+                allowedTransitions = Set.of(OrderStatus.CANCELLED); // Có thể thêm logic trả hàng nếu cần
+                break;
+            case CANCELLED:
+                allowedTransitions = Set.of();
+                break;
+            default:
+                throw new InvalidOperationException("Trạng thái hiện tại không hợp lệ: " + currentStatus);
         }
-
-        if (currentStatus == OrderStatus.DELIVERED && newStatus != OrderStatus.CANCELLED) {
-            throw new InvalidOperationException("Delivered order can only be cancelled (for returns)");
+        if (!allowedTransitions.contains(newStatus)) {
+            throw new InvalidOperationException("Không thể chuyển từ " + currentStatus + " sang " + newStatus);
         }
-
-        // Add more rules as needed
     }
 
     private String generateOrderNumber() {
