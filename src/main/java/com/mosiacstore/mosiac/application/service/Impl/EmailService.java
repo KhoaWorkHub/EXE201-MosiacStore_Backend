@@ -40,6 +40,30 @@ public class EmailService {
     private String frontendUrl;
 
     /**
+     * Send order paid confirmation email
+     * @param order The paid order
+     * @return CompletableFuture for async operation
+     */
+    @Async
+    public CompletableFuture<Void> sendOrderPaidEmail(Order order) {
+        String subject = "Payment Confirmed for Order #" + order.getOrderNumber();
+        String template = "order-paid";
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("order", order);
+        variables.put("frontendUrl", frontendUrl);
+        variables.put("supportEmail", "support@mosiacstore.com");
+        variables.put("contactPhone", "+84 788-732-514");
+
+        // Add payment information if available
+        if (order.getPayments() != null && !order.getPayments().isEmpty()) {
+            variables.put("payment", order.getPayments().iterator().next());
+        }
+
+        return sendEmailWithTemplate(order.getUser().getEmail(), subject, template, variables);
+    }
+
+    /**
      * Send order confirmation email
      * @param order The order to confirm
      * @return CompletableFuture for async operation
