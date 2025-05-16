@@ -6,8 +6,6 @@ import com.mosiacstore.mosiac.application.dto.response.CheckoutResponse;
 import com.mosiacstore.mosiac.application.dto.response.OrderResponse;
 import com.mosiacstore.mosiac.application.dto.response.PageResponse;
 import com.mosiacstore.mosiac.application.dto.response.PaymentResponse;
-import com.mosiacstore.mosiac.application.service.AdminNotificationService;
-import com.mosiacstore.mosiac.application.service.Impl.EmailService;
 import com.mosiacstore.mosiac.application.service.OrderService;
 import com.mosiacstore.mosiac.application.service.PaymentService;
 import com.mosiacstore.mosiac.infrastructure.security.CustomUserDetail;
@@ -36,8 +34,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final PaymentService paymentService;
-    private final AdminNotificationService adminNotificationService;
-    private final EmailService emailService;
+
 
     @Operation(
             summary = "Get user orders",
