@@ -1,11 +1,10 @@
 package com.mosiacstore.mosiac.application.service.Impl;
 
+import com.mosiacstore.mosiac.application.dto.UserDto;
 import com.mosiacstore.mosiac.application.dto.request.CheckoutRequest;
-import com.mosiacstore.mosiac.application.dto.response.CheckoutResponse;
-import com.mosiacstore.mosiac.application.dto.response.OrderItemResponse;
-import com.mosiacstore.mosiac.application.dto.response.OrderResponse;
-import com.mosiacstore.mosiac.application.dto.response.PageResponse;
-import com.mosiacstore.mosiac.application.dto.response.PaymentResponse;
+import com.mosiacstore.mosiac.application.dto.request.OrderItemRequest;
+import com.mosiacstore.mosiac.application.dto.request.UpdateOrderItemsRequest;
+import com.mosiacstore.mosiac.application.dto.response.*;
 import com.mosiacstore.mosiac.application.exception.EntityNotFoundException;
 import com.mosiacstore.mosiac.application.exception.InvalidOperationException;
 import com.mosiacstore.mosiac.application.service.AdminNotificationService;
@@ -20,17 +19,20 @@ import com.mosiacstore.mosiac.domain.order.OrderStatus;
 import com.mosiacstore.mosiac.domain.payment.Payment;
 import com.mosiacstore.mosiac.domain.payment.PaymentMethod;
 import com.mosiacstore.mosiac.domain.payment.PaymentStatus;
+import com.mosiacstore.mosiac.domain.product.Product;
 import com.mosiacstore.mosiac.domain.product.ProductVariant;
 import com.mosiacstore.mosiac.domain.user.User;
-import com.mosiacstore.mosiac.infrastructure.repository.AddressRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.CartRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.OrderItemRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.OrderRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.PaymentRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.ProductRepository;
-import com.mosiacstore.mosiac.infrastructure.repository.UserRepository;
+import com.mosiacstore.mosiac.infrastructure.repository.*;
 
+import com.opencsv.CSVWriter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -39,7 +41,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
@@ -51,6 +57,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
@@ -61,6 +68,7 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentRepository paymentRepository;
     private final PaymentService paymentService;
     private final ProductRepository productRepository;
+    private final ProductVariantRepository variantRepository;
     private final AdminNotificationService adminNotificationService;
     private final EmailService emailService;
 
@@ -544,5 +552,444 @@ public class OrderServiceImpl implements OrderService {
                 .bankAccountNumber(payment.getBankAccountNumber())
                 .paymentNote(payment.getPaymentNote())
                 .build();
+    }
+
+    @Override
+    public OrderDetailResponse getOrderDetails(UUID id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found with ID: " + id));
+
+        return mapToOrderDetailResponse(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderItems(UUID id, UpdateOrderItemsRequest request, UUID adminId) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found with ID: " + id));
+
+        // Validate order status
+        if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new InvalidOperationException("Cannot update items for delivered or cancelled orders");
+        }
+
+        // First, remove all existing items
+        orderItemRepository.deleteAll(order.getOrderItems());
+        order.getOrderItems().clear();
+
+        // Then add the new items
+        BigDecimal totalProductAmount = BigDecimal.ZERO;
+
+        for (OrderItemRequest itemRequest : request.getItems()) {
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + itemRequest.getProductId()));
+
+            ProductVariant variant = null;
+            if (itemRequest.getVariantId() != null) {
+                variant = variantRepository.findById(itemRequest.getVariantId())
+                        .orElseThrow(() -> new EntityNotFoundException("Product variant not found with ID: " + itemRequest.getVariantId()));
+            }
+
+            BigDecimal price;
+            if (itemRequest.getPriceOverride() != null) {
+                price = itemRequest.getPriceOverride();
+            } else if (variant != null && variant.getPriceAdjustment() != null) {
+                price = product.getPrice().add(variant.getPriceAdjustment());
+            } else {
+                price = product.getPrice();
+            }
+
+            BigDecimal subtotal = price.multiply(new BigDecimal(itemRequest.getQuantity()));
+
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(order);
+            orderItem.setProduct(product);
+            orderItem.setVariant(variant);
+            orderItem.setProductNameSnapshot(product.getName());
+
+            if (variant != null) {
+                String variantInfo = String.format("Size: %s%s",
+                        variant.getSize(),
+                        variant.getColor() != null ? ", Color: " + variant.getColor() : "");
+                orderItem.setVariantInfoSnapshot(variantInfo);
+            }
+
+            orderItem.setPriceSnapshot(price);
+            orderItem.setQuantity(itemRequest.getQuantity());
+            orderItem.setSubtotal(subtotal);
+
+            OrderItem savedOrderItem = orderItemRepository.save(orderItem);
+            order.getOrderItems().add(savedOrderItem);
+
+            totalProductAmount = totalProductAmount.add(subtotal);
+        }
+
+        // Recalculate order totals
+        order.setTotalProductAmount(totalProductAmount);
+
+        // Recalculate shipping fee if applicable
+        BigDecimal shippingFee = totalProductAmount.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
+                ? BigDecimal.ZERO
+                : STANDARD_SHIPPING_FEE;
+        order.setShippingFee(shippingFee);
+
+        order.setTotalAmount(totalProductAmount.add(shippingFee));
+        order.setUpdatedAt(LocalDateTime.now());
+
+        // Update payment amount if exists
+        if (!order.getPayments().isEmpty()) {
+            Payment payment = order.getPayments().iterator().next();
+            payment.setAmount(order.getTotalAmount());
+            paymentRepository.save(payment);
+        }
+
+        Order updatedOrder = orderRepository.save(order);
+        return mapToOrderResponse(updatedOrder);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse addOrderItem(UUID id, OrderItemRequest request, UUID adminId) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found with ID: " + id));
+
+        // Validate order status
+        if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new InvalidOperationException("Cannot add items to delivered or cancelled orders");
+        }
+
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + request.getProductId()));
+
+        ProductVariant variant = null;
+        if (request.getVariantId() != null) {
+            variant = variantRepository.findById(request.getVariantId())
+                    .orElseThrow(() -> new EntityNotFoundException("Product variant not found with ID: " + request.getVariantId()));
+        }
+
+        BigDecimal price;
+        if (request.getPriceOverride() != null) {
+            price = request.getPriceOverride();
+        } else if (variant != null && variant.getPriceAdjustment() != null) {
+            price = product.getPrice().add(variant.getPriceAdjustment());
+        } else {
+            price = product.getPrice();
+        }
+
+        BigDecimal subtotal = price.multiply(new BigDecimal(request.getQuantity()));
+
+        OrderItem orderItem = new OrderItem();
+        orderItem.setOrder(order);
+        orderItem.setProduct(product);
+        orderItem.setVariant(variant);
+        orderItem.setProductNameSnapshot(product.getName());
+
+        if (variant != null) {
+            String variantInfo = String.format("Size: %s%s",
+                    variant.getSize(),
+                    variant.getColor() != null ? ", Color: " + variant.getColor() : "");
+            orderItem.setVariantInfoSnapshot(variantInfo);
+        }
+
+        orderItem.setPriceSnapshot(price);
+        orderItem.setQuantity(request.getQuantity());
+        orderItem.setSubtotal(subtotal);
+
+        OrderItem savedOrderItem = orderItemRepository.save(orderItem);
+        order.getOrderItems().add(savedOrderItem);
+
+        // Recalculate order totals
+        BigDecimal totalProductAmount = order.getTotalProductAmount().add(subtotal);
+        order.setTotalProductAmount(totalProductAmount);
+
+        // Recalculate shipping fee if applicable
+        BigDecimal shippingFee = totalProductAmount.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
+                ? BigDecimal.ZERO
+                : STANDARD_SHIPPING_FEE;
+        order.setShippingFee(shippingFee);
+
+        order.setTotalAmount(totalProductAmount.add(shippingFee));
+        order.setUpdatedAt(LocalDateTime.now());
+
+        // Update payment amount if exists
+        if (!order.getPayments().isEmpty()) {
+            Payment payment = order.getPayments().iterator().next();
+            payment.setAmount(order.getTotalAmount());
+            paymentRepository.save(payment);
+        }
+
+        Order updatedOrder = orderRepository.save(order);
+        return mapToOrderResponse(updatedOrder);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse removeOrderItem(UUID id, UUID itemId, UUID adminId) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found with ID: " + id));
+
+        // Validate order status
+        if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new InvalidOperationException("Cannot remove items from delivered or cancelled orders");
+        }
+
+        OrderItem itemToRemove = null;
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getId().equals(itemId)) {
+                itemToRemove = item;
+                break;
+            }
+        }
+
+        if (itemToRemove == null) {
+            throw new EntityNotFoundException("Order item not found with ID: " + itemId);
+        }
+
+        BigDecimal subtotalToRemove = itemToRemove.getSubtotal();
+
+        // Remove the item
+        order.getOrderItems().remove(itemToRemove);
+        orderItemRepository.delete(itemToRemove);
+
+        // Recalculate order totals
+        BigDecimal totalProductAmount = order.getTotalProductAmount().subtract(subtotalToRemove);
+        order.setTotalProductAmount(totalProductAmount);
+
+        // Recalculate shipping fee if applicable
+        BigDecimal shippingFee = totalProductAmount.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
+                ? BigDecimal.ZERO
+                : STANDARD_SHIPPING_FEE;
+        order.setShippingFee(shippingFee);
+
+        order.setTotalAmount(totalProductAmount.add(shippingFee));
+        order.setUpdatedAt(LocalDateTime.now());
+
+        // Update payment amount if exists
+        if (!order.getPayments().isEmpty()) {
+            Payment payment = order.getPayments().iterator().next();
+            payment.setAmount(order.getTotalAmount());
+            paymentRepository.save(payment);
+        }
+
+        Order updatedOrder = orderRepository.save(order);
+        return mapToOrderResponse(updatedOrder);
+    }
+
+    @Override
+    public Resource exportOrders(String format, String status, LocalDateTime startDate, LocalDateTime endDate) {
+        // Set default dates if not provided
+        LocalDateTime start = startDate != null ? startDate : LocalDate.now().minusMonths(1).atStartOfDay();
+        LocalDateTime end = endDate != null ? endDate : LocalDateTime.now();
+
+        // Create specification for date range
+        Specification<Order> spec = Specification.where((root, query, cb) ->
+                cb.between(root.get("createdAt"), start, end));
+
+        // Add filter for status if provided
+        if (status != null && !status.isEmpty()) {
+            try {
+                OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), orderStatus));
+            } catch (IllegalArgumentException ignored) {
+                // Invalid status, ignore this filter
+            }
+        }
+
+        // Get all orders matching the criteria
+        List<Order> orders = orderRepository.findAll(spec);
+
+        // Generate export file based on format
+        if ("csv".equalsIgnoreCase(format)) {
+            return generateCsvExport(orders);
+        } else if ("xlsx".equalsIgnoreCase(format) || "excel".equalsIgnoreCase(format)) {
+            return generateExcelExport(orders);
+        } else {
+            // Default to CSV
+            return generateCsvExport(orders);
+        }
+    }
+
+// Helper methods for the new functionality
+
+    private OrderDetailResponse mapToOrderDetailResponse(Order order) {
+        List<OrderItemResponse> orderItemResponses = order.getOrderItems().stream()
+                .map(this::mapToOrderItemResponse)
+                .collect(Collectors.toList());
+
+        // Get payment information if exists
+        PaymentResponse paymentResponse = null;
+        if (!order.getPayments().isEmpty()) {
+            Payment payment = order.getPayments().iterator().next();
+            paymentResponse = mapToPaymentResponse(payment);
+        }
+
+        // Get invoice information if exists
+        InvoiceResponse invoiceResponse = null;
+        if (order.getInvoice() != null) {
+            invoiceResponse = InvoiceResponse.builder()
+                    .id(order.getInvoice().getId())
+                    .orderId(order.getId())
+                    .invoiceNumber(order.getInvoice().getInvoiceNumber())
+                    .pdfUrl(order.getInvoice().getPdfUrl())
+                    .issuedDate(order.getInvoice().getIssuedDate())
+                    .sent(order.getInvoice().getSent())
+                    .build();
+        }
+
+        // Map user data
+        UserDto userDto = null;
+        if (order.getUser() != null) {
+            userDto = UserDto.builder()
+                    .id(order.getUser().getId())
+                    .email(order.getUser().getEmail())
+                    .phoneNumber(order.getUser().getPhoneNumber())
+                    .fullName(order.getUser().getFullName())
+                    .role(order.getUser().getRole())
+                    .build();
+        }
+
+        return OrderDetailResponse.builder()
+                .id(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .status(order.getStatus())
+                .totalProductAmount(order.getTotalProductAmount())
+                .shippingFee(order.getShippingFee())
+                .totalAmount(order.getTotalAmount())
+                .recipientName(order.getRecipientName())
+                .recipientPhone(order.getRecipientPhone())
+                .shippingAddressSnapshot(order.getShippingAddressSnapshot())
+                .note(order.getNote())
+                .adminNote(order.getAdminNote())
+                .paymentDue(order.getPaymentDue())
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .orderItems(orderItemResponses)
+                .payment(paymentResponse)
+                .invoice(invoiceResponse)
+                .user(userDto)
+                .build();
+    }
+
+    private Resource generateCsvExport(List<Order> orders) {
+        try {
+            StringWriter stringWriter = new StringWriter();
+            CSVWriter csvWriter = new CSVWriter(stringWriter);
+
+            // Write header
+            String[] header = {
+                    "Order Number", "Status", "Customer Name", "Phone", "Address",
+                    "Total Product Amount", "Shipping Fee", "Total Amount",
+                    "Payment Method", "Payment Status", "Created At", "Updated At", "Note"
+            };
+            csvWriter.writeNext(header);
+
+            // Write data
+            for (Order order : orders) {
+                String paymentMethod = "";
+                String paymentStatus = "";
+
+                if (!order.getPayments().isEmpty()) {
+                    Payment payment = order.getPayments().iterator().next();
+                    paymentMethod = payment.getPaymentMethod().name();
+                    paymentStatus = payment.getStatus().name();
+                }
+
+                String[] row = {
+                        order.getOrderNumber(),
+                        order.getStatus().name(),
+                        order.getRecipientName(),
+                        order.getRecipientPhone(),
+                        order.getShippingAddressSnapshot(),
+                        order.getTotalProductAmount().toString(),
+                        order.getShippingFee().toString(),
+                        order.getTotalAmount().toString(),
+                        paymentMethod,
+                        paymentStatus,
+                        order.getCreatedAt().toString(),
+                        order.getUpdatedAt().toString(),
+                        order.getNote() != null ? order.getNote() : ""
+                };
+
+                csvWriter.writeNext(row);
+            }
+
+            csvWriter.close();
+
+            // Convert to resource
+            byte[] bytes = stringWriter.toString().getBytes(StandardCharsets.UTF_8);
+            ByteArrayResource resource = new ByteArrayResource(bytes);
+
+            return resource;
+        } catch (Exception e) {
+            log.error("Error generating CSV export", e);
+            throw new RuntimeException("Failed to generate CSV export", e);
+        }
+    }
+
+    private Resource generateExcelExport(List<Order> orders) {
+        try {
+            XSSFWorkbook workbook = new XSSFWorkbook();
+            XSSFSheet sheet = workbook.createSheet("Orders");
+
+            // Create header row
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {
+                    "Order Number", "Status", "Customer Name", "Phone", "Address",
+                    "Total Product Amount", "Shipping Fee", "Total Amount",
+                    "Payment Method", "Payment Status", "Created At", "Updated At", "Note"
+            };
+
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+            }
+
+            // Create data rows
+            int rowNum = 1;
+            for (Order order : orders) {
+                Row row = sheet.createRow(rowNum++);
+
+                String paymentMethod = "";
+                String paymentStatus = "";
+
+                if (!order.getPayments().isEmpty()) {
+                    Payment payment = order.getPayments().iterator().next();
+                    paymentMethod = payment.getPaymentMethod().name();
+                    paymentStatus = payment.getStatus().name();
+                }
+
+                row.createCell(0).setCellValue(order.getOrderNumber());
+                row.createCell(1).setCellValue(order.getStatus().name());
+                row.createCell(2).setCellValue(order.getRecipientName());
+                row.createCell(3).setCellValue(order.getRecipientPhone());
+                row.createCell(4).setCellValue(order.getShippingAddressSnapshot());
+                row.createCell(5).setCellValue(order.getTotalProductAmount().doubleValue());
+                row.createCell(6).setCellValue(order.getShippingFee().doubleValue());
+                row.createCell(7).setCellValue(order.getTotalAmount().doubleValue());
+                row.createCell(8).setCellValue(paymentMethod);
+                row.createCell(9).setCellValue(paymentStatus);
+                row.createCell(10).setCellValue(order.getCreatedAt().toString());
+                row.createCell(11).setCellValue(order.getUpdatedAt().toString());
+                row.createCell(12).setCellValue(order.getNote() != null ? order.getNote() : "");
+            }
+
+            // Auto-size columns
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Write to bytes
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            workbook.close();
+
+            // Convert to resource
+            ByteArrayResource resource = new ByteArrayResource(outputStream.toByteArray());
+
+            return resource;
+        } catch (Exception e) {
+            log.error("Error generating Excel export", e);
+            throw new RuntimeException("Failed to generate Excel export", e);
+        }
     }
 }
