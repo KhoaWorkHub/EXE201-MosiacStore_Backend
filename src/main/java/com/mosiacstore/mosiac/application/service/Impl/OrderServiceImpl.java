@@ -176,15 +176,18 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Calculate shipping fee (free shipping over threshold)
-        BigDecimal shippingFee = totalProductAmount.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
-                ? BigDecimal.ZERO
-                : STANDARD_SHIPPING_FEE;
+        BigDecimal shippingFee = BigDecimal.ZERO; // Shipping will be calculated separately
+        String shippingNote = "Phí vận chuyển sẽ được tính riêng và thông báo qua email";
 
         BigDecimal totalAmount = totalProductAmount.add(shippingFee);
 
         // Create order
         Order order = new Order();
+        if (request.getNote() != null && !request.getNote().isEmpty()) {
+            order.setNote(request.getNote() + " | " + shippingNote);
+        } else {
+            order.setNote(shippingNote);
+        }
         order.setUser(user);
         order.setOrderNumber(generateOrderNumber());
         order.setStatus(OrderStatus.PENDING_PAYMENT);

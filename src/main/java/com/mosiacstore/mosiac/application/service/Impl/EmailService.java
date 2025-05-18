@@ -16,6 +16,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -84,6 +85,8 @@ public class EmailService {
             context.setVariable("frontendUrl", frontendUrl);
             context.setVariable("supportEmail", "support@mosiacstore.com");
             context.setVariable("contactPhone", "+84 788-732-514");
+            context.setVariable("shippingNotice", "Phí vận chuyển sẽ được tính riêng sau khi đơn hàng được xác nhận.");
+            context.setVariable("shippingPaymentInfo", "Chúng tôi sẽ gửi email thông báo phí vận chuyển cùng mã QR để thanh toán.");
 
             // Handle payment
             if (order.getPayments() != null && !order.getPayments().isEmpty()) {
@@ -219,6 +222,30 @@ public class EmailService {
                 }
             });
         });
+    }
+
+    /**
+     * Send shipping fee notification email with QR code for payment
+     * @param order The order
+     * @param shippingFee The calculated shipping fee
+     * @return CompletableFuture for async operation
+     */
+    @Async
+    public CompletableFuture<Void> sendShippingFeeEmail(Order order, BigDecimal shippingFee) {
+        String subject = "Phí vận chuyển cho đơn hàng #" + order.getOrderNumber();
+        String template = "shipping-fee";
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("order", order);
+        variables.put("shippingFee", shippingFee);
+        variables.put("bankName", "MOMO");
+        variables.put("accountNumber", "0788732514");
+        variables.put("transferDescription", "Ship DH" + order.getOrderNumber());
+        variables.put("frontendUrl", frontendUrl);
+        variables.put("supportEmail", "support@mosiacstore.com");
+        variables.put("contactPhone", "+84 788-732-514");
+
+        return sendEmailWithTemplate(order.getUser().getEmail(), subject, template, variables);
     }
 
     /**
