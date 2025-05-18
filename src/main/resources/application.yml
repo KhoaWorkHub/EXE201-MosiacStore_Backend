@@ -45,8 +45,6 @@ spring:
               - email
               - profile
             redirect-uri: ${GOOGLE_REDIRECT_URI:http://ec2-54-169-96-88.ap-southeast-1.compute.amazonaws.com/login/oauth2/code/google}
-#            redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/login/oauth2/code/google}
-
 
   servlet:
     multipart:
